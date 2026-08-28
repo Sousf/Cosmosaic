@@ -106,4 +106,6 @@ and AppKit UI, verified by hand against the live WindowServer.
 
 Master layout, focus-follows-mouse, `hyprmacctl` CLI, scratchpad/special
 workspace, per-app workspace rules, cross-monitor `movewindow`, Homebrew cask,
-Developer ID signing + notarization.
+Developer ID signing + notarization. Window-move animations were considered
+and deliberately skipped: without compositor access macOS can only fake them
+(AX frame-stepping or snapshot fly-overs), and the tradeoffs weren't worth it.
