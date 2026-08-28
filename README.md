@@ -50,6 +50,10 @@ general {
     col.active_border = rgba(33ccffee)
 }
 
+input {
+    follow_mouse = 1                     # hover focus, Hyprland-style
+}                                        # (0 to disable)
+
 $mod = ALT                               # ALT = Option. SUPER = Command —
                                          # careful, SUPER binds shadow macOS
                                          # shortcuts like Cmd+Q.
@@ -104,7 +108,7 @@ and AppKit UI, verified by hand against the live WindowServer.
 
 ## Roadmap
 
-Master layout, focus-follows-mouse, `hyprmacctl` CLI, scratchpad/special
+Master layout, `hyprmacctl` CLI, scratchpad/special
 workspace, per-app workspace rules, cross-monitor `movewindow`, Homebrew cask,
 Developer ID signing + notarization. Window-move animations were considered
 and deliberately skipped: without compositor access macOS can only fake them

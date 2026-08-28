@@ -20,6 +20,10 @@ final class ConfigManager {
         col.inactive_border = rgba(59595900)
     }
 
+    input {
+        follow_mouse = 1    # Hyprland-style hover focus; 0 to disable
+    }
+
     $mod = ALT
 
     # Launch things

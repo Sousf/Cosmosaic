@@ -123,6 +123,15 @@ enum AX {
         NSRunningApplication(processIdentifier: pid)?.activate()
     }
 
+    /// Focus for follow-mouse: make the window key without an explicit raise,
+    /// X11-style. Cross-app hovers still raise the target window as a side
+    /// effect of app activation — macOS offers no way around that.
+    static func focusWithoutRaise(_ element: AXUIElement, pid: pid_t) {
+        AXUIElementSetAttributeValue(element, kAXMainAttribute as CFString, kCFBooleanTrue)
+        AXUIElementSetAttributeValue(element, kAXFocusedAttribute as CFString, kCFBooleanTrue)
+        NSRunningApplication(processIdentifier: pid)?.activate()
+    }
+
     static func close(_ element: AXUIElement) {
         guard let button: AXUIElement = copyAttribute(element, kAXCloseButtonAttribute) else {
             return

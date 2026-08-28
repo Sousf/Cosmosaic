@@ -115,7 +115,7 @@ extension ConfigParser {
                     throw ConfigError(line: lineNumber, message: "nested blocks are not supported")
                 }
                 let name = line.dropLast().trimmingCharacters(in: .whitespaces)
-                guard name == "general" else {
+                guard name == "general" || name == "input" else {
                     throw ConfigError(line: lineNumber, message: "unknown block '\(name)'")
                 }
                 openBlock = (name, lineNumber)
@@ -130,6 +130,10 @@ extension ConfigParser {
 
             if openBlock?.name == "general" {
                 try setGeneralOption(&config.general, key: key, value: value, line: lineNumber)
+                continue
+            }
+            if openBlock?.name == "input" {
+                try setInputOption(&config.input, key: key, value: value, line: lineNumber)
                 continue
             }
 
@@ -180,6 +184,21 @@ extension ConfigParser {
         case "col.inactive_border": general.inactiveBorderColor = try parseColor(value, line: line)
         default:
             throw ConfigError(line: line, message: "unknown general option '\(key)'")
+        }
+    }
+
+    static func setInputOption(_ input: inout InputConfig,
+                               key: String, value: String, line: Int) throws {
+        switch key {
+        case "follow_mouse":
+            switch value.lowercased() {
+            case "1", "true", "yes", "on": input.followMouse = true
+            case "0", "false", "no", "off": input.followMouse = false
+            default:
+                throw ConfigError(line: line, message: "follow_mouse expects 0/1, got '\(value)'")
+            }
+        default:
+            throw ConfigError(line: line, message: "unknown input option '\(key)'")
         }
     }
 

@@ -13,6 +13,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private var borderOverlay: BorderOverlay!
     private var keybindingsModel: KeybindingsModel!
     private var keybindingsWindow: KeybindingsWindowController!
+    private var focusFollowsMouse: FocusFollowsMouse!
+    private var permissionGranted = false
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         controller = TilingController(windowManager: windowManager)
@@ -31,12 +33,15 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             self?.keybindingsWindow.show()
         }
 
+        focusFollowsMouse = FocusFollowsMouse(controller: controller)
+
         configManager.onConfigChanged = { [weak self] config in
             guard let self else { return }
             self.controller.apply(config: config)
             self.hotkeyManager.rebind(to: config.binds)
             self.statusMenu.refresh()
             self.keybindingsModel.refresh()
+            self.focusFollowsMouse.setEnabled(self.permissionGranted && config.input.followMouse)
         }
         configManager.onError = { [weak self] _ in
             self?.statusMenu.refresh()
@@ -59,9 +64,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
         onboarding.ensurePermission { [weak self] in
             guard let self else { return }
+            self.permissionGranted = true
             self.windowManager.start()
             self.statusMenu.refresh()
             self.keybindingsModel.refresh()
+            self.focusFollowsMouse.setEnabled(self.configManager.config.input.followMouse)
         }
     }
 

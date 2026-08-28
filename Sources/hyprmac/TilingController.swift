@@ -272,6 +272,32 @@ final class TilingController {
         AX.focus(managed.element, pid: managed.pid)
     }
 
+    // MARK: - Focus follows mouse
+
+    /// The current-workspace window under an AX-space point. Floating windows
+    /// win over tiled ones (they render above); tiled frames come from the
+    /// layout tree, floating frames are read live.
+    private func windowAt(axPoint: CGPoint) -> WindowID? {
+        for id in state.currentWorkspace.floating {
+            guard let managed = windowManager.windows[id],
+                  let frame = AX.frame(of: managed.element) else { continue }
+            if frame.contains(axPoint) { return id }
+        }
+        for (id, frame) in currentTiledFrames() where frame.contains(axPoint) {
+            return id
+        }
+        return nil
+    }
+
+    /// Hover focus: focus the window under the mouse without raising it.
+    func hoverFocus(at axPoint: CGPoint) {
+        guard !paused, config.input.followMouse else { return }
+        guard let id = windowAt(axPoint: axPoint),
+              id != windowManager.focusedID,
+              let managed = windowManager.windows[id] else { return }
+        AX.focusWithoutRaise(managed.element, pid: managed.pid)
+    }
+
     private func moveWindow(_ direction: Direction) {
         guard let focusedID = windowManager.focusedID,
               !state.isFloating(focusedID) else { return }

@@ -99,7 +99,15 @@ public struct BindProvenance: Sendable, Equatable {
     }
 }
 
+public struct InputConfig: Sendable, Equatable {
+    /// Hyprland-style hover focus. Defaults on, like Hyprland's follow_mouse=1.
+    public var followMouse: Bool = true
+
+    public init() {}
+}
+
 public struct Config: Sendable, Equatable {
+    public var input = InputConfig()
     public var binds: [Keybind] = []
     /// Parallel to `binds`: source location of each bind.
     public var bindProvenance: [BindProvenance] = []

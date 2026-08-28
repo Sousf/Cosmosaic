@@ -130,6 +130,26 @@ final class ConfigParserTests: XCTestCase {
         XCTAssertThrowsError(try ConfigParser.parse("general {\n    gaps_in = 4\n"))
     }
 
+    func testParsesInputBlockFollowMouse() throws {
+        let off = try ConfigParser.parse("input {\n    follow_mouse = 0\n}")
+        XCTAssertFalse(off.input.followMouse)
+
+        let on = try ConfigParser.parse("input {\n    follow_mouse = 1\n}")
+        XCTAssertTrue(on.input.followMouse)
+
+        let word = try ConfigParser.parse("input {\n    follow_mouse = false\n}")
+        XCTAssertFalse(word.input.followMouse)
+    }
+
+    func testFollowMouseDefaultsOn() throws {
+        let config = try ConfigParser.parse("bind = ALT, Q, killactive")
+        XCTAssertTrue(config.input.followMouse)
+    }
+
+    func testUnknownInputOptionThrows() {
+        XCTAssertThrowsError(try ConfigParser.parse("input {\n    frobnicate = 1\n}"))
+    }
+
     func testBindProvenanceRecordsLineRawModsAndComment() throws {
         let text = """
         $mod = ALT
