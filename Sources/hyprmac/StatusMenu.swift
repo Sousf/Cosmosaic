@@ -8,16 +8,37 @@ final class StatusMenu: NSObject, NSMenuDelegate {
     private let statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
     private let controller: TilingController
     private let configManager: ConfigManager
+    private let menu = NSMenu()
+
+    /// Left-click on the icon opens the keybindings window.
+    var onOpenKeybindings: (() -> Void)?
 
     init(controller: TilingController, configManager: ConfigManager) {
         self.controller = controller
         self.configManager = configManager
         super.init()
 
-        let menu = NSMenu()
         menu.delegate = self
-        statusItem.menu = menu
+        // The menu is attached only for right-clicks (see statusClicked);
+        // left-click runs the button action instead.
+        statusItem.button?.target = self
+        statusItem.button?.action = #selector(statusClicked)
+        statusItem.button?.sendAction(on: [.leftMouseUp, .rightMouseUp])
         refresh()
+    }
+
+    @objc private func statusClicked() {
+        if NSApp.currentEvent?.type == .rightMouseUp {
+            statusItem.menu = menu
+            statusItem.button?.performClick(nil)
+        } else {
+            onOpenKeybindings?()
+        }
+    }
+
+    func menuDidClose(_ menu: NSMenu) {
+        // Detach again so the next left-click reaches statusClicked.
+        statusItem.menu = nil
     }
 
     func refresh() {
@@ -57,6 +78,11 @@ final class StatusMenu: NSObject, NSMenuDelegate {
         menu.addItem(withTitle: "hyprmac — workspace \(controller.state.current)",
                      action: nil, keyEquivalent: "")
 
+        let keybindings = NSMenuItem(title: "Keybindings…",
+                                     action: #selector(openKeybindings), keyEquivalent: "")
+        keybindings.target = self
+        menu.addItem(keybindings)
+
         if let error = configManager.lastError {
             let item = NSMenuItem(title: "Config error: \(error.description)",
                                   action: nil, keyEquivalent: "")
@@ -87,6 +113,10 @@ final class StatusMenu: NSObject, NSMenuDelegate {
                               keyEquivalent: "")
         quit.target = self
         menu.addItem(quit)
+    }
+
+    @objc private func openKeybindings() {
+        onOpenKeybindings?()
     }
 
     @objc private func openAccessibilitySettings() {

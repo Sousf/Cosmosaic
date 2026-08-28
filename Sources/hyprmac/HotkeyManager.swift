@@ -10,13 +10,27 @@ final class HotkeyManager {
     private var hotKeyRefs: [EventHotKeyRef] = []
     private var handlerRef: EventHandlerRef?
     private var actions: [UInt32: Dispatcher] = [:]
+    private var currentBinds: [Keybind] = []
 
     var onDispatch: ((Dispatcher) -> Void)?
 
     /// Keys that failed to register (name unknown or already taken system-wide).
     private(set) var bindErrors: [String] = []
 
+    /// Release all hotkeys while the keybindings UI records a shortcut, so the
+    /// combo being recorded isn't swallowed by an existing bind.
+    func suspend() {
+        for ref in hotKeyRefs { UnregisterEventHotKey(ref) }
+        hotKeyRefs.removeAll()
+        actions.removeAll()
+    }
+
+    func resume() {
+        rebind(to: currentBinds)
+    }
+
     func rebind(to binds: [Keybind]) {
+        currentBinds = binds
         unbindAll()
         installHandlerIfNeeded()
 

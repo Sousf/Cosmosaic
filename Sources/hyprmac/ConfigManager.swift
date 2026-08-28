@@ -135,6 +135,25 @@ final class ConfigManager {
         }
     }
 
+    /// Current raw file text, for UI-driven surgical edits.
+    func fileText() -> String? {
+        try? String(contentsOf: configURL, encoding: .utf8)
+    }
+
+    /// Write edited text and reload immediately (the watcher would also fire,
+    /// but this makes UI edits apply without the debounce delay).
+    func write(text: String) {
+        do {
+            try text.write(to: configURL, atomically: true, encoding: .utf8)
+        } catch {
+            lastError = ConfigError(line: 0,
+                                    message: "cannot write \(configURL.path): \(error.localizedDescription)")
+            onError?(lastError!)
+            return
+        }
+        load()
+    }
+
     /// Watch the directory, not the file: editors save atomically by replacing
     /// the file, which would orphan a file-level watch.
     private func watchDirectory() {

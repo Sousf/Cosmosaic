@@ -80,10 +80,15 @@ arrows (`LEFT`/`RIGHT`/`UP`/`DOWN`), `MINUS`, `EQUAL`, `COMMA`, `PERIOD`,
 A parse error never kills the running layout: hyprmac keeps the last good
 config and shows ⚠︎ in the menu bar with the line number.
 
-## Menu bar
+## Menu bar & keybindings UI
 
-The status item shows the current workspace (◫ 1). The menu offers
-Pause/Resume Tiling, Reload Config, Open Config File, and Quit.
+The status item shows the current workspace (◫ 1). **Left-click it to open
+the Keybindings window**: click any shortcut chip and press a new combo to
+rebind it, change actions from a dropdown, add or delete bindings, and see
+conflict warnings. Edits are written straight into `hyprmac.conf` as surgical
+single-line changes — your comments and `$mod` variables survive — so the UI
+and hand-editing stay interchangeable. Right-click the icon for the menu:
+Pause/Resume Tiling, Reload Config, Open Config File, Quit.
 
 ## Development
 
