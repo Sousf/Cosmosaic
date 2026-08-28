@@ -79,6 +79,22 @@ final class WindowManager {
         windows[managed.id] = managed
         watchWindowElement(element, pid: pid)
         onWindowAdded?(managed)
+        // Creation and focus-change events race in either order for brand-new
+        // windows; if this window is already the app's focused one, adopt the
+        // focus that would otherwise have been dropped.
+        if let focusedElement = AX.focusedWindow(ofPID: pid),
+           CFEqual(focusedElement, element) {
+            setFocused(managed.id)
+        }
+    }
+
+    /// Register an element we haven't seen if it's a tileable window.
+    private func registerIfStandard(_ element: AXUIElement) {
+        guard AX.isStandardWindow(element), findID(of: element) == nil else { return }
+        var pid: pid_t = 0
+        AXUIElementGetPid(element, &pid)
+        let appName = NSRunningApplication(processIdentifier: pid)?.localizedName ?? "?"
+        register(element: element, pid: pid, appName: appName)
     }
 
     private func unregister(_ id: WindowID) {
@@ -143,25 +159,22 @@ final class WindowManager {
 
     private func handleAXEvent(name: String, element: AXUIElement) {
         switch name {
-        case kAXWindowCreatedNotification:
-            guard AX.isStandardWindow(element), findID(of: element) == nil else { return }
-            var pid: pid_t = 0
-            AXUIElementGetPid(element, &pid)
-            let appName = NSRunningApplication(processIdentifier: pid)?.localizedName ?? "?"
-            register(element: element, pid: pid, appName: appName)
+        case kAXWindowCreatedNotification, kAXWindowDeminiaturizedNotification:
+            registerIfStandard(element)
 
         case kAXUIElementDestroyedNotification, kAXWindowMiniaturizedNotification:
             if let id = findID(of: element) { unregister(id) }
 
-        case kAXWindowDeminiaturizedNotification:
-            guard AX.isStandardWindow(element), findID(of: element) == nil else { return }
-            var pid: pid_t = 0
-            AXUIElementGetPid(element, &pid)
-            let appName = NSRunningApplication(processIdentifier: pid)?.localizedName ?? "?"
-            register(element: element, pid: pid, appName: appName)
-
         case kAXFocusedWindowChangedNotification:
-            setFocused(findID(of: element))
+            if let id = findID(of: element) {
+                setFocused(id)
+            } else {
+                // Focus can land on a window we haven't registered yet (the
+                // created event may follow the focus event). Adopt it instead
+                // of dropping the focus on the floor; register() back-fills
+                // the focused state.
+                registerIfStandard(element)
+            }
 
         default:
             break

@@ -42,8 +42,14 @@ cat > "$APP/Contents/Info.plist" <<'PLIST'
 </plist>
 PLIST
 
-# Ad-hoc signature for local use. Distribution needs a Developer ID
+# Prefer the stable self-signed identity so the Accessibility grant survives
+# rebuilds; fall back to ad-hoc. Distribution needs a Developer ID
 # certificate + notarization; see README.
-codesign --force --sign - "$APP"
+IDENTITY="hyprmac-dev"
+if ! security find-identity -v -p codesigning 2>/dev/null | grep -q "\"$IDENTITY\""; then
+    IDENTITY="-"
+    echo "note: hyprmac-dev cert not found, ad-hoc signing (permission re-grant needed per rebuild)"
+fi
+codesign --force --sign "$IDENTITY" "$APP"
 
 echo "Built $APP"
