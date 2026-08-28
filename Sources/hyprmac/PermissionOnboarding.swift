@@ -34,11 +34,13 @@ final class PermissionOnboarding {
 
     private func showExplainer() {
         let window = NSWindow(
-            contentRect: NSRect(x: 0, y: 0, width: 460, height: 240),
+            contentRect: NSRect(x: 0, y: 0, width: 460, height: 320),
             styleMask: [.titled, .closable], backing: .buffered, defer: false)
         window.title = "Welcome to hyprmac"
         window.center()
         window.isReleasedWhenClosed = false
+        // Stay above normal windows so this can't get buried and forgotten.
+        window.level = .floating
 
         let text = NSTextField(wrappingLabelWithString: """
         hyprmac tiles your windows the way Hyprland does on Linux. To move and \
@@ -48,9 +50,14 @@ final class PermissionOnboarding {
         1. Open System Settings → Privacy & Security → Accessibility
         2. Enable hyprmac in the list
 
+        Already enabled but this window is still here? The app was rebuilt, \
+        which invalidates the old grant even though the switch still shows on. \
+        Remove hyprmac from the list with the − button, then relaunch the app \
+        and grant it again.
+
         This window closes by itself once the permission is granted.
         """)
-        text.frame = NSRect(x: 24, y: 70, width: 412, height: 150)
+        text.frame = NSRect(x: 24, y: 70, width: 412, height: 230)
 
         let button = NSButton(title: "Open Accessibility Settings",
                               target: self, action: #selector(openSettings))

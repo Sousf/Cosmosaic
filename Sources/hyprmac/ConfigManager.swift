@@ -103,8 +103,14 @@ final class ConfigManager {
     private func createDefaultIfMissing() {
         let fm = FileManager.default
         guard !fm.fileExists(atPath: configURL.path) else { return }
-        try? fm.createDirectory(at: configDirectory, withIntermediateDirectories: true)
-        try? Self.defaultConfigText.write(to: configURL, atomically: true, encoding: .utf8)
+        do {
+            try fm.createDirectory(at: configDirectory, withIntermediateDirectories: true)
+            try Self.defaultConfigText.write(to: configURL, atomically: true, encoding: .utf8)
+        } catch {
+            lastError = ConfigError(line: 0,
+                                    message: "cannot create \(configURL.path): \(error.localizedDescription)")
+            onError?(lastError!)
+        }
     }
 
     func load() {

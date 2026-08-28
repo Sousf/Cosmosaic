@@ -21,6 +21,10 @@ final class StatusMenu: NSObject, NSMenuDelegate {
     }
 
     func refresh() {
+        guard AX.isTrusted else {
+            statusItem.button?.title = "◫ ⚠"
+            return
+        }
         let workspace = controller.state.current
         let badge = controller.paused ? "⏸" : "◫"
         statusItem.button?.title = "\(badge) \(workspace)"
@@ -31,6 +35,24 @@ final class StatusMenu: NSObject, NSMenuDelegate {
 
     func menuNeedsUpdate(_ menu: NSMenu) {
         menu.removeAllItems()
+
+        // Before the Accessibility grant nothing is running; say exactly that
+        // instead of offering controls that would mislead.
+        guard AX.isTrusted else {
+            menu.addItem(withTitle: "Waiting for Accessibility permission…",
+                         action: nil, keyEquivalent: "")
+            let open = NSMenuItem(title: "Open Accessibility Settings",
+                                  action: #selector(openAccessibilitySettings),
+                                  keyEquivalent: "")
+            open.target = self
+            menu.addItem(open)
+            menu.addItem(.separator())
+            let quit = NSMenuItem(title: "Quit hyprmac", action: #selector(quit),
+                                  keyEquivalent: "")
+            quit.target = self
+            menu.addItem(quit)
+            return
+        }
 
         menu.addItem(withTitle: "hyprmac — workspace \(controller.state.current)",
                      action: nil, keyEquivalent: "")
@@ -65,6 +87,11 @@ final class StatusMenu: NSObject, NSMenuDelegate {
                               keyEquivalent: "")
         quit.target = self
         menu.addItem(quit)
+    }
+
+    @objc private func openAccessibilitySettings() {
+        let url = URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility")!
+        NSWorkspace.shared.open(url)
     }
 
     @objc private func togglePause() {
