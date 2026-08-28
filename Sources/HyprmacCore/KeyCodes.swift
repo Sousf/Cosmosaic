@@ -30,6 +30,13 @@ public enum KeyCodes {
         table[name.uppercased()]
     }
 
+    private static let reverseTable: [UInt32: String] =
+        Dictionary(uniqueKeysWithValues: table.map { ($0.value, $0.key) })
+
+    public static func name(for keyCode: UInt32) -> String? {
+        reverseTable[keyCode]
+    }
+
     public static func carbonFlags(for mods: Set<Modifier>) -> UInt32 {
         var flags: UInt32 = 0
         if mods.contains(.super) { flags |= 0x0100 }  // cmdKey

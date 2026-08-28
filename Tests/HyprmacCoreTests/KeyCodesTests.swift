@@ -20,6 +20,13 @@ final class KeyCodesTests: XCTestCase {
         XCTAssertNil(KeyCodes.keyCode(for: "FROB"))
     }
 
+    func testReverseLookupReturnsKeyName() {
+        XCTAssertEqual(KeyCodes.name(for: 36), "RETURN")
+        XCTAssertEqual(KeyCodes.name(for: 4), "H")
+        XCTAssertEqual(KeyCodes.name(for: 18), "1")
+        XCTAssertNil(KeyCodes.name(for: 999))
+    }
+
     func testModifierCarbonFlags() {
         XCTAssertEqual(KeyCodes.carbonFlags(for: [.super]), 256)
         XCTAssertEqual(KeyCodes.carbonFlags(for: [.shift]), 512)

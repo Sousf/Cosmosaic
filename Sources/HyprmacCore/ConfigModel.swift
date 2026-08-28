@@ -82,8 +82,27 @@ public struct WindowRule: Sendable, Equatable {
     }
 }
 
+/// Where a bind came from in the config file, for surgical UI edits that
+/// preserve `$variables` and comments.
+public struct BindProvenance: Sendable, Equatable {
+    /// 1-based line number in the file.
+    public var line: Int
+    /// The mods field exactly as written, before variable substitution.
+    public var rawMods: String
+    /// Trailing comment on the line (including `#`), if any.
+    public var comment: String?
+
+    public init(line: Int, rawMods: String, comment: String? = nil) {
+        self.line = line
+        self.rawMods = rawMods
+        self.comment = comment
+    }
+}
+
 public struct Config: Sendable, Equatable {
     public var binds: [Keybind] = []
+    /// Parallel to `binds`: source location of each bind.
+    public var bindProvenance: [BindProvenance] = []
     public var general = GeneralConfig()
     public var windowRules: [WindowRule] = []
 

@@ -129,4 +129,20 @@ final class ConfigParserTests: XCTestCase {
     func testUnclosedBlockThrows() {
         XCTAssertThrowsError(try ConfigParser.parse("general {\n    gaps_in = 4\n"))
     }
+
+    func testBindProvenanceRecordsLineRawModsAndComment() throws {
+        let text = """
+        $mod = ALT
+
+        bind = $mod, H, movefocus, l  # focus left
+        bind = ALT SHIFT, J, movewindow, d
+        """
+        let config = try ConfigParser.parse(text)
+
+        XCTAssertEqual(config.bindProvenance, [
+            BindProvenance(line: 3, rawMods: "$mod", comment: "# focus left"),
+            BindProvenance(line: 4, rawMods: "ALT SHIFT", comment: nil),
+        ])
+        XCTAssertEqual(config.binds.count, config.bindProvenance.count)
+    }
 }

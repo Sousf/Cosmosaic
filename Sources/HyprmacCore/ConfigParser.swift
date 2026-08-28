@@ -89,11 +89,14 @@ extension ConfigParser {
         for (index, rawLine) in text.split(separator: "\n", omittingEmptySubsequences: false).enumerated() {
             let lineNumber = index + 1
             var line = String(rawLine)
+            var comment: String?
             if let hash = line.firstIndex(of: "#") {
+                comment = line[hash...].trimmingCharacters(in: .whitespaces)
                 line = String(line[..<hash])
             }
             line = line.trimmingCharacters(in: .whitespaces)
             guard !line.isEmpty else { continue }
+            let unsubstituted = line
 
             // Substitute longest variable names first so $mode isn't clobbered by $mod.
             for (name, value) in variables.sorted(by: { $0.key.count > $1.key.count }) {
@@ -141,6 +144,13 @@ extension ConfigParser {
             switch key {
             case "bind":
                 config.binds.append(try parseBind(fields: fields, line: lineNumber))
+                let rawMods = unsubstituted.firstIndex(of: "=").map { eqIndex in
+                    unsubstituted[unsubstituted.index(after: eqIndex)...]
+                        .split(separator: ",", omittingEmptySubsequences: false)[0]
+                        .trimmingCharacters(in: .whitespaces)
+                } ?? fields[0]
+                config.bindProvenance.append(
+                    BindProvenance(line: lineNumber, rawMods: rawMods, comment: comment))
             case "windowrule":
                 config.windowRules.append(try parseWindowRule(fields: fields, line: lineNumber))
             default:
