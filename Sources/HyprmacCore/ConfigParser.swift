@@ -4,6 +4,11 @@ public struct ConfigError: Error, Equatable, CustomStringConvertible {
     public let line: Int
     public let message: String
     public var description: String { "line \(line): \(message)" }
+
+    public init(line: Int, message: String) {
+        self.line = line
+        self.message = message
+    }
 }
 
 extension ConfigParser {

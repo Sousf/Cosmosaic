@@ -1,4 +1,8 @@
-import Foundation
+import AppKit
 
-// Placeholder entry point; the AppKit app comes after HyprmacCore is built test-first.
-print("hyprmac")
+let app = NSApplication.shared
+let delegate = AppDelegate()
+app.delegate = delegate
+// Menu-bar agent: no Dock icon, no app menu.
+app.setActivationPolicy(.accessory)
+app.run()

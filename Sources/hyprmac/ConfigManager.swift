@@ -1,0 +1,150 @@
+import Foundation
+import HyprmacCore
+
+/// Loads ~/.config/hyprmac/hyprmac.conf, writes the default on first run, and
+/// hot-reloads on change. A broken config keeps the last good one running.
+@MainActor
+final class ConfigManager {
+
+    static let defaultConfigText = """
+    # hyprmac — Hyprland-like tiling for macOS
+    # Syntax follows hyprland.conf; see https://wiki.hyprland.org
+    # ALT is the Option key. SUPER is Command (careful: SUPER binds shadow
+    # standard macOS shortcuts like Cmd+Q).
+
+    general {
+        gaps_in = 6
+        gaps_out = 12
+        border_size = 2
+        col.active_border = rgba(33ccffee)
+        col.inactive_border = rgba(59595900)
+    }
+
+    $mod = ALT
+
+    # Launch things
+    bind = $mod, RETURN, exec, open -a Terminal
+    bind = $mod, B, exec, open -a Safari
+
+    # Window management
+    bind = $mod, Q, killactive
+    bind = $mod, V, togglefloating
+    bind = $mod, F, fullscreen
+
+    # Move focus (vim keys and arrows)
+    bind = $mod, H, movefocus, l
+    bind = $mod, L, movefocus, r
+    bind = $mod, K, movefocus, u
+    bind = $mod, J, movefocus, d
+    bind = $mod, LEFT, movefocus, l
+    bind = $mod, RIGHT, movefocus, r
+    bind = $mod, UP, movefocus, u
+    bind = $mod, DOWN, movefocus, d
+
+    # Swap windows
+    bind = $mod SHIFT, H, movewindow, l
+    bind = $mod SHIFT, L, movewindow, r
+    bind = $mod SHIFT, K, movewindow, u
+    bind = $mod SHIFT, J, movewindow, d
+
+    # Resize the focused window
+    bind = $mod CTRL, H, resizeactive, -40 0
+    bind = $mod CTRL, L, resizeactive, 40 0
+    bind = $mod CTRL, K, resizeactive, 0 -40
+    bind = $mod CTRL, J, resizeactive, 0 40
+
+    # Workspaces
+    bind = $mod, 1, workspace, 1
+    bind = $mod, 2, workspace, 2
+    bind = $mod, 3, workspace, 3
+    bind = $mod, 4, workspace, 4
+    bind = $mod, 5, workspace, 5
+    bind = $mod, 6, workspace, 6
+    bind = $mod, 7, workspace, 7
+    bind = $mod, 8, workspace, 8
+    bind = $mod, 9, workspace, 9
+    bind = $mod SHIFT, 1, movetoworkspace, 1
+    bind = $mod SHIFT, 2, movetoworkspace, 2
+    bind = $mod SHIFT, 3, movetoworkspace, 3
+    bind = $mod SHIFT, 4, movetoworkspace, 4
+    bind = $mod SHIFT, 5, movetoworkspace, 5
+    bind = $mod SHIFT, 6, movetoworkspace, 6
+    bind = $mod SHIFT, 7, movetoworkspace, 7
+    bind = $mod SHIFT, 8, movetoworkspace, 8
+    bind = $mod SHIFT, 9, movetoworkspace, 9
+
+    # Reload this file (also happens automatically on save)
+    bind = $mod SHIFT, C, reload
+
+    # Apps that should never be tiled
+    windowrule = float, ^(System Settings)$
+    windowrule = float, ^(Calculator)$
+    windowrule = float, ^(Activity Monitor)$
+    """
+
+    let configDirectory = FileManager.default.homeDirectoryForCurrentUser
+        .appendingPathComponent(".config/hyprmac")
+    var configURL: URL { configDirectory.appendingPathComponent("hyprmac.conf") }
+
+    private(set) var config = Config()
+    private(set) var lastError: ConfigError?
+    private var watcher: DispatchSourceFileSystemObject?
+    private var reloadDebounce: DispatchWorkItem?
+
+    var onConfigChanged: ((Config) -> Void)?
+    var onError: ((ConfigError) -> Void)?
+
+    func start() {
+        createDefaultIfMissing()
+        load()
+        watchDirectory()
+    }
+
+    private func createDefaultIfMissing() {
+        let fm = FileManager.default
+        guard !fm.fileExists(atPath: configURL.path) else { return }
+        try? fm.createDirectory(at: configDirectory, withIntermediateDirectories: true)
+        try? Self.defaultConfigText.write(to: configURL, atomically: true, encoding: .utf8)
+    }
+
+    func load() {
+        let text: String
+        do {
+            text = try String(contentsOf: configURL, encoding: .utf8)
+        } catch {
+            lastError = ConfigError(line: 0, message: "cannot read \(configURL.path)")
+            onError?(lastError!)
+            return
+        }
+        do {
+            config = try ConfigParser.parse(text)
+            lastError = nil
+            onConfigChanged?(config)
+        } catch let error as ConfigError {
+            lastError = error
+            onError?(error)
+        } catch {
+            lastError = ConfigError(line: 0, message: "\(error)")
+            onError?(lastError!)
+        }
+    }
+
+    /// Watch the directory, not the file: editors save atomically by replacing
+    /// the file, which would orphan a file-level watch.
+    private func watchDirectory() {
+        let fd = open(configDirectory.path, O_EVTONLY)
+        guard fd >= 0 else { return }
+        let source = DispatchSource.makeFileSystemObjectSource(
+            fileDescriptor: fd, eventMask: [.write], queue: .main)
+        source.setEventHandler { [weak self] in
+            guard let self else { return }
+            self.reloadDebounce?.cancel()
+            let work = DispatchWorkItem { self.load() }
+            self.reloadDebounce = work
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.2, execute: work)
+        }
+        source.setCancelHandler { close(fd) }
+        source.resume()
+        watcher = source
+    }
+}
