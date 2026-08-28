@@ -40,6 +40,18 @@ final class WindowManager {
             guard let app = note.userInfo?[NSWorkspace.applicationUserInfoKey] as? NSRunningApplication else { return }
             MainActor.assumeIsolated { self?.syncFocus(pid: app.processIdentifier) }
         }
+        // Hidden apps' windows leave the layout (and drop focus) like
+        // minimized ones; unhiding re-adopts them.
+        center.addObserver(forName: NSWorkspace.didHideApplicationNotification,
+                           object: nil, queue: .main) { [weak self] note in
+            guard let app = note.userInfo?[NSWorkspace.applicationUserInfoKey] as? NSRunningApplication else { return }
+            MainActor.assumeIsolated { self?.dropWindows(ofPID: app.processIdentifier) }
+        }
+        center.addObserver(forName: NSWorkspace.didUnhideApplicationNotification,
+                           object: nil, queue: .main) { [weak self] note in
+            guard let app = note.userInfo?[NSWorkspace.applicationUserInfoKey] as? NSRunningApplication else { return }
+            MainActor.assumeIsolated { self?.scanWindows(of: app) }
+        }
 
         for app in NSWorkspace.shared.runningApplications {
             adopt(app: app, retryDelays: [0])
@@ -110,7 +122,13 @@ final class WindowManager {
     // MARK: - Focus
 
     private func syncFocus(pid: pid_t) {
-        guard let element = AX.focusedWindow(ofPID: pid) else { return }
+        guard let element = AX.focusedWindow(ofPID: pid) else {
+            // The active app has no focused window (e.g. the Finder desktop):
+            // focus is nowhere. Clearing it lets the border overlay hide
+            // instead of lingering around a gone window.
+            setFocused(nil)
+            return
+        }
         setFocused(findID(of: element))
     }
 
@@ -181,15 +199,20 @@ final class WindowManager {
         }
     }
 
+    /// Unregister an app's windows but keep its AX observer (hide/unhide).
+    private func dropWindows(ofPID pid: pid_t) {
+        for (id, managed) in windows where managed.pid == pid {
+            unregister(id)
+        }
+    }
+
     private func dropApp(pid: pid_t) {
         if let observer = observers.removeValue(forKey: pid) {
             CFRunLoopRemoveSource(CFRunLoopGetMain(),
                                   AXObserverGetRunLoopSource(observer),
                                   .defaultMode)
         }
-        for (id, managed) in windows where managed.pid == pid {
-            unregister(id)
-        }
+        dropWindows(ofPID: pid)
     }
 
     /// Drop windows whose AX element no longer responds (app crashed, etc.).
