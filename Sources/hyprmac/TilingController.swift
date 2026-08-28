@@ -70,8 +70,38 @@ final class TilingController {
     }
 
     private func windowRemoved(_ id: WindowID) {
+        let wasOnCurrentWorkspace = state.workspace(of: id) == state.current
+        // The layout tree still knows the frame the window occupied; capture
+        // it before removal so focus can fall to whatever reclaims that space.
+        let oldFrame = wasOnCurrentWorkspace ? currentTiledFrames()[id] : nil
         state.remove(id)
         relayout()
+
+        // macOS only refocuses within the closed window's own app; a tiler
+        // must hand focus to the nearest workspace neighbor itself.
+        guard !paused, wasOnCurrentWorkspace,
+              windowManager.focusedID == nil || windowManager.focusedID == id else { return }
+        refocusAfterRemoval(near: oldFrame)
+    }
+
+    private func refocusAfterRemoval(near oldFrame: CGRect?) {
+        var target: WindowID?
+        if let oldFrame {
+            let mid = CGPoint(x: oldFrame.midX, y: oldFrame.midY)
+            let frames = currentTiledFrames()
+            // The dwindle sibling that reclaimed the space contains the old
+            // midpoint; otherwise take the geometrically nearest window.
+            target = frames.first { $0.value.contains(mid) }?.key
+                ?? frames.min {
+                    hypot($0.value.midX - mid.x, $0.value.midY - mid.y)
+                        < hypot($1.value.midX - mid.x, $1.value.midY - mid.y)
+                }?.key
+        }
+        let fallback = state.currentWorkspace.lastFocused
+            ?? state.currentWorkspace.allWindows.first
+        guard let id = target ?? fallback,
+              let managed = windowManager.windows[id] else { return }
+        AX.focus(managed.element, pid: managed.pid)
     }
 
     private func focusChanged(_ id: WindowID?) {
