@@ -53,10 +53,15 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             self.refreshBorder()
         }
 
+        // Config (and the keybindings UI it feeds) needs no permissions —
+        // load it immediately. Only window management waits for the grant.
+        configManager.start()
+
         onboarding.ensurePermission { [weak self] in
             guard let self else { return }
-            self.configManager.start()
             self.windowManager.start()
+            self.statusMenu.refresh()
+            self.keybindingsModel.refresh()
         }
     }
 

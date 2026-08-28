@@ -15,6 +15,7 @@ final class KeybindingsModel: ObservableObject {
     @Published var recording: RecordingTarget?
     /// Changes on every reload so row views rebuild with fresh state.
     @Published private(set) var refreshToken = UUID()
+    @Published private(set) var axTrusted = false
 
     private let configManager: ConfigManager
     var onRecordingStarted: (() -> Void)?
@@ -28,7 +29,25 @@ final class KeybindingsModel: ObservableObject {
 
     func refresh() {
         config = configManager.config
+        axTrusted = AX.isTrusted
         refreshToken = UUID()
+    }
+
+    /// Replace the whole config file with the shipped defaults (confirmed
+    /// destructive action — offered from the empty state).
+    func restoreDefaults() {
+        let alert = NSAlert()
+        alert.messageText = "Restore default keybindings?"
+        alert.informativeText = "This replaces hyprmac.conf with the default configuration. Any custom settings in the file are overwritten."
+        alert.addButton(withTitle: "Restore Defaults")
+        alert.addButton(withTitle: "Cancel")
+        guard alert.runModal() == .alertFirstButtonReturn else { return }
+        configManager.write(text: ConfigManager.defaultConfigText)
+    }
+
+    func openAccessibilitySettings() {
+        let url = URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility")!
+        NSWorkspace.shared.open(url)
     }
 
     /// Key combos used by more than one bind, e.g. "ALT+H".
@@ -191,11 +210,20 @@ struct KeybindingsView: View {
     var body: some View {
         VStack(spacing: 0) {
             header
+            if !model.axTrusted {
+                permissionBanner
+            }
             Divider()
             if model.config.binds.isEmpty {
                 Spacer()
-                Text("No keybindings yet — click “Add Binding”.")
-                    .foregroundStyle(.secondary)
+                VStack(spacing: 12) {
+                    Text("This config has no keybindings.")
+                        .foregroundStyle(.secondary)
+                    Button("Restore Default Keybindings") { model.restoreDefaults() }
+                    Text("or click “Add Binding” to start from scratch")
+                        .font(.caption)
+                        .foregroundStyle(.tertiary)
+                }
                 Spacer()
             } else {
                 bindList
@@ -204,6 +232,19 @@ struct KeybindingsView: View {
             footer
         }
         .frame(minWidth: 700, minHeight: 460)
+    }
+
+    private var permissionBanner: some View {
+        HStack {
+            Image(systemName: "exclamationmark.triangle.fill")
+                .foregroundStyle(.orange)
+            Text("Keybindings can be edited now, but tiling stays inactive until the Accessibility permission is granted.")
+                .font(.callout)
+            Spacer()
+            Button("Open Accessibility Settings") { model.openAccessibilitySettings() }
+        }
+        .padding(.horizontal)
+        .padding(.bottom, 10)
     }
 
     private var header: some View {
