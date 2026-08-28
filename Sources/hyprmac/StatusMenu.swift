@@ -93,10 +93,17 @@ final class StatusMenu: NSObject, NSMenuDelegate {
         }
         menu.addItem(.separator())
 
-        let pause = NSMenuItem(title: controller.paused ? "Resume Tiling" : "Pause Tiling",
-                               action: #selector(togglePause), keyEquivalent: "")
-        pause.target = self
-        menu.addItem(pause)
+        let tiling = NSMenuItem(title: "Tiling",
+                                action: #selector(togglePause), keyEquivalent: "")
+        tiling.target = self
+        tiling.state = controller.paused ? .off : .on
+        menu.addItem(tiling)
+
+        let followMouse = NSMenuItem(title: "Focus Follows Mouse",
+                                     action: #selector(toggleFollowMouse), keyEquivalent: "")
+        followMouse.target = self
+        followMouse.state = configManager.config.input.followMouse ? .on : .off
+        menu.addItem(followMouse)
 
         let reload = NSMenuItem(title: "Reload Config", action: #selector(reloadConfig),
                                 keyEquivalent: "")
@@ -126,6 +133,10 @@ final class StatusMenu: NSObject, NSMenuDelegate {
 
     @objc private func togglePause() {
         controller.setPaused(!controller.paused)
+    }
+
+    @objc private func toggleFollowMouse() {
+        configManager.setFollowMouse(!configManager.config.input.followMouse)
     }
 
     @objc private func reloadConfig() {

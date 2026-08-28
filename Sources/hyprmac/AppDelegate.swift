@@ -32,6 +32,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         statusMenu.onOpenKeybindings = { [weak self] in
             self?.keybindingsWindow.show()
         }
+        keybindingsModel.onSetTilingEnabled = { [weak self] enabled in
+            self?.controller.setPaused(!enabled)
+        }
 
         focusFollowsMouse = FocusFollowsMouse(controller: controller)
 
@@ -55,6 +58,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         controller.onStateChanged = { [weak self] in
             guard let self else { return }
             self.statusMenu.refresh()
+            self.keybindingsModel.setTilingPaused(self.controller.paused)
             self.refreshBorder()
         }
 
@@ -76,6 +80,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         guard !controller.paused,
               let focusedID = windowManager.focusedID,
               let managed = windowManager.windows[focusedID],
+              controller.state.workspace(of: focusedID) == controller.state.current,
               let frame = AX.frame(of: managed.element) else {
             borderOverlay.hide()
             return

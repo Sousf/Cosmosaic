@@ -94,6 +94,38 @@ final class ConfigEditorTests: XCTestCase {
         XCTAssertEqual(try ConfigParser.parse(result).binds.count, 1)
     }
 
+    func testSetOptionReplacesValueKeepingCommentAndIndent() throws {
+        let text = """
+        input {
+            follow_mouse = 1    # hover focus
+        }
+        """
+        let result = ConfigEditor.setOption(in: text, block: "input",
+                                            key: "follow_mouse", value: "0")
+
+        XCTAssertTrue(result.contains("    follow_mouse = 0    # hover focus"))
+        XCTAssertFalse(try ConfigParser.parse(result).input.followMouse)
+    }
+
+    func testSetOptionAddsKeyToExistingBlock() throws {
+        let text = "general {\n    gaps_in = 6\n}"
+        let result = ConfigEditor.setOption(in: text, block: "general",
+                                            key: "gaps_out", value: "20")
+
+        XCTAssertTrue(result.contains("    gaps_out = 20"))
+        XCTAssertEqual(try ConfigParser.parse(result).general.gapsOut, 20)
+        XCTAssertEqual(try ConfigParser.parse(result).general.gapsIn, 6)
+    }
+
+    func testSetOptionCreatesMissingBlock() throws {
+        let text = "bind = ALT, Q, killactive"
+        let result = ConfigEditor.setOption(in: text, block: "input",
+                                            key: "follow_mouse", value: "0")
+
+        XCTAssertFalse(try ConfigParser.parse(result).input.followMouse)
+        XCTAssertEqual(try ConfigParser.parse(result).binds.count, 1)
+    }
+
     func testSerializeAllDispatcherShapes() {
         XCTAssertEqual(ConfigEditor.serialize(
             Keybind(mods: [.alt], key: "Q", dispatcher: .killactive)),

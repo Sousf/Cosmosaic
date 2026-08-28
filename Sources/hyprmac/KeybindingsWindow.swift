@@ -16,11 +16,29 @@ final class KeybindingsModel: ObservableObject {
     /// Changes on every reload so row views rebuild with fresh state.
     @Published private(set) var refreshToken = UUID()
     @Published private(set) var axTrusted = false
+    /// Mirrors the tiling controller's pause state (session-only).
+    @Published private(set) var tilingPaused = false
 
     private let configManager: ConfigManager
     var onRecordingStarted: (() -> Void)?
     var onRecordingEnded: (() -> Void)?
+    /// Toggles the controller's pause; wired by the app delegate.
+    var onSetTilingEnabled: ((Bool) -> Void)?
     private var monitor: Any?
+
+    var followMouse: Bool { config.input.followMouse }
+
+    func setTilingPaused(_ paused: Bool) {
+        tilingPaused = paused
+    }
+
+    func setTilingEnabled(_ enabled: Bool) {
+        onSetTilingEnabled?(enabled)
+    }
+
+    func setFollowMouse(_ enabled: Bool) {
+        configManager.setFollowMouse(enabled)
+    }
 
     init(configManager: ConfigManager) {
         self.configManager = configManager
@@ -248,9 +266,19 @@ struct KeybindingsView: View {
     }
 
     private var header: some View {
-        HStack {
+        HStack(spacing: 16) {
             Text("Keybindings").font(.title2.bold())
             Spacer()
+            Toggle("Tiling", isOn: Binding(
+                get: { !model.tilingPaused },
+                set: { model.setTilingEnabled($0) }))
+                .toggleStyle(.switch)
+                .help("Pause or resume window tiling (until quit; not saved)")
+            Toggle("Focus follows mouse", isOn: Binding(
+                get: { model.followMouse },
+                set: { model.setFollowMouse($0) }))
+                .toggleStyle(.switch)
+                .help("Hover focus — saved to hyprmac.conf")
             if model.recording == .newBind {
                 Text("Press shortcut… (Esc cancels)")
                     .foregroundStyle(.orange)

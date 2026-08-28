@@ -139,6 +139,15 @@ final class ConfigManager {
         }
     }
 
+    /// Persist the follow-mouse toggle into the config file (surgical edit;
+    /// hot-reload then applies it everywhere).
+    func setFollowMouse(_ enabled: Bool) {
+        guard let text = fileText() else { return }
+        write(text: ConfigEditor.setOption(in: text, block: "input",
+                                           key: "follow_mouse",
+                                           value: enabled ? "1" : "0"))
+    }
+
     /// Current raw file text, for UI-driven surgical edits.
     func fileText() -> String? {
         try? String(contentsOf: configURL, encoding: .utf8)
