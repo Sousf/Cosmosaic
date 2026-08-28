@@ -203,6 +203,52 @@ enum DispatcherKind: String, CaseIterable, Identifiable {
         }
     }
 
+    /// Section grouping for the editor list, in display order.
+    var category: String {
+        switch self {
+        case .exec: return "Launch"
+        case .killactive, .togglefloating, .fullscreen: return "Windows"
+        case .movefocus: return "Focus"
+        case .movewindow: return "Move Windows"
+        case .resizeactive: return "Resize"
+        case .workspace, .movetoworkspace: return "Workspaces"
+        case .reload: return "System"
+        }
+    }
+
+    static let categoryOrder = ["Launch", "Windows", "Focus", "Move Windows",
+                                "Resize", "Workspaces", "System"]
+
+    var symbol: String {
+        switch self {
+        case .exec: return "terminal.fill"
+        case .killactive: return "xmark.square.fill"
+        case .movefocus: return "scope"
+        case .movewindow: return "rectangle.2.swap"
+        case .workspace: return "square.grid.3x3.middle.filled"
+        case .movetoworkspace: return "arrowshape.turn.up.forward.fill"
+        case .togglefloating: return "macwindow.on.rectangle"
+        case .fullscreen: return "arrow.up.left.and.arrow.down.right"
+        case .resizeactive: return "arrow.left.and.right.square.fill"
+        case .reload: return "arrow.clockwise"
+        }
+    }
+
+    var tint: Color {
+        switch self {
+        case .exec: return .green
+        case .killactive: return .red
+        case .movefocus: return .blue
+        case .movewindow: return .indigo
+        case .workspace: return .purple
+        case .movetoworkspace: return .pink
+        case .togglefloating: return .orange
+        case .fullscreen: return .cyan
+        case .resizeactive: return .mint
+        case .reload: return .gray
+        }
+    }
+
     /// A sensible starting dispatcher when the user switches kinds.
     var defaultDispatcher: Dispatcher {
         switch self {
@@ -225,96 +271,198 @@ enum DispatcherKind: String, CaseIterable, Identifiable {
 struct KeybindingsView: View {
     @ObservedObject var model: KeybindingsModel
 
+    private var sections: [(title: String, rows: [(index: Int, bind: Keybind)])] {
+        let grouped = Dictionary(grouping: Array(model.config.binds.enumerated())) {
+            DispatcherKind($0.element.dispatcher).category
+        }
+        return DispatcherKind.categoryOrder.compactMap { title in
+            guard let rows = grouped[title], !rows.isEmpty else { return nil }
+            return (title, rows.map { (index: $0.offset, bind: $0.element) })
+        }
+    }
+
     var body: some View {
         VStack(spacing: 0) {
             header
-            if !model.axTrusted {
-                permissionBanner
-            }
             Divider()
             if model.config.binds.isEmpty {
-                Spacer()
-                VStack(spacing: 12) {
-                    Text("This config has no keybindings.")
-                        .foregroundStyle(.secondary)
-                    Button("Restore Default Keybindings") { model.restoreDefaults() }
-                    Text("or click “Add Binding” to start from scratch")
-                        .font(.caption)
-                        .foregroundStyle(.tertiary)
-                }
-                Spacer()
+                emptyState
             } else {
                 bindList
             }
             Divider()
             footer
         }
-        .frame(minWidth: 700, minHeight: 460)
+        .background(Color(nsColor: .windowBackgroundColor))
+        .frame(minWidth: 720, minHeight: 500)
     }
 
-    private var permissionBanner: some View {
-        HStack {
-            Image(systemName: "exclamationmark.triangle.fill")
-                .foregroundStyle(.orange)
-            Text("Keybindings can be edited now, but tiling stays inactive until the Accessibility permission is granted.")
-                .font(.callout)
-            Spacer()
-            Button("Open Accessibility Settings") { model.openAccessibilitySettings() }
-        }
-        .padding(.horizontal)
-        .padding(.bottom, 10)
-    }
+    // MARK: Header
 
     private var header: some View {
-        HStack(spacing: 16) {
-            Text("Keybindings").font(.title2.bold())
+        HStack(spacing: 12) {
+            VStack(alignment: .leading, spacing: 2) {
+                Text("Keybindings").font(.title2.bold())
+                Text("\(model.config.binds.count) bindings · hyprmac.conf")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
             Spacer()
-            Toggle("Tiling", isOn: Binding(
-                get: { !model.tilingPaused },
-                set: { model.setTilingEnabled($0) }))
-                .toggleStyle(.switch)
-                .help("Pause or resume window tiling (until quit; not saved)")
-            Toggle("Focus follows mouse", isOn: Binding(
-                get: { model.followMouse },
-                set: { model.setFollowMouse($0) }))
-                .toggleStyle(.switch)
-                .help("Hover focus — saved to hyprmac.conf")
             if model.recording == .newBind {
-                Text("Press shortcut… (Esc cancels)")
+                Label("Press shortcut… (esc cancels)", systemImage: "keyboard")
                     .foregroundStyle(.orange)
+                    .font(.callout.weight(.medium))
             }
             Button {
                 model.startRecording(.newBind)
             } label: {
                 Label("Add Binding", systemImage: "plus")
             }
+            .buttonStyle(.borderedProminent)
             .disabled(model.recording != nil)
         }
-        .padding()
+        .padding(.horizontal, 20)
+        .padding(.vertical, 14)
     }
+
+    // MARK: List
 
     private var bindList: some View {
         ScrollView {
-            LazyVStack(spacing: 6) {
-                ForEach(Array(model.config.binds.enumerated()), id: \.offset) { index, bind in
-                    BindRow(model: model, index: index, bind: bind,
-                            conflicted: model.conflicts.contains(model.comboKey(bind)))
+            LazyVStack(alignment: .leading, spacing: 18) {
+                togglesCard
+                if !model.axTrusted {
+                    permissionCard
+                }
+                ForEach(sections, id: \.title) { section in
+                    VStack(alignment: .leading, spacing: 6) {
+                        Text(section.title)
+                            .font(.subheadline.weight(.semibold))
+                            .foregroundStyle(.secondary)
+                            .padding(.leading, 6)
+                        card {
+                            ForEach(section.rows, id: \.index) { row in
+                                BindRow(model: model, index: row.index, bind: row.bind,
+                                        conflicted: model.conflicts.contains(model.comboKey(row.bind)))
+                                if row.index != section.rows.last?.index {
+                                    Divider().padding(.leading, 122)
+                                }
+                            }
+                        }
+                    }
                 }
             }
-            .padding()
+            .padding(20)
         }
         .id(model.refreshToken)
     }
 
+    private var togglesCard: some View {
+        card {
+            settingRow(symbol: "squares.leading.rectangle", tint: .blue,
+                       title: "Tiling",
+                       subtitle: "Pause leaves every window where it is (until quit)") {
+                Toggle("", isOn: Binding(
+                    get: { !model.tilingPaused },
+                    set: { model.setTilingEnabled($0) }))
+                    .toggleStyle(.switch).labelsHidden()
+            }
+            Divider().padding(.leading, 56)
+            settingRow(symbol: "cursorarrow.motionlines", tint: .teal,
+                       title: "Focus follows mouse",
+                       subtitle: "Hover focus, Hyprland-style — saved to hyprmac.conf") {
+                Toggle("", isOn: Binding(
+                    get: { model.followMouse },
+                    set: { model.setFollowMouse($0) }))
+                    .toggleStyle(.switch).labelsHidden()
+            }
+        }
+    }
+
+    private var permissionCard: some View {
+        card {
+            settingRow(symbol: "exclamationmark.triangle.fill", tint: .orange,
+                       title: "Waiting for Accessibility permission",
+                       subtitle: "Keybindings can be edited now; tiling starts once granted") {
+                Button("Open Settings") { model.openAccessibilitySettings() }
+            }
+        }
+    }
+
+    private func settingRow(symbol: String, tint: Color, title: String,
+                            subtitle: String,
+                            @ViewBuilder control: () -> some View) -> some View {
+        HStack(spacing: 12) {
+            IconTile(symbol: symbol, tint: tint)
+            VStack(alignment: .leading, spacing: 1) {
+                Text(title)
+                Text(subtitle).font(.caption).foregroundStyle(.secondary)
+            }
+            Spacer()
+            control()
+        }
+        .padding(.horizontal, 14)
+        .padding(.vertical, 9)
+    }
+
+    private func card(@ViewBuilder content: () -> some View) -> some View {
+        VStack(spacing: 0) { content() }
+            .background(
+                RoundedRectangle(cornerRadius: 10, style: .continuous)
+                    .fill(Color.primary.opacity(0.035)))
+            .overlay(
+                RoundedRectangle(cornerRadius: 10, style: .continuous)
+                    .strokeBorder(Color.primary.opacity(0.07)))
+    }
+
+    // MARK: Empty / footer
+
+    private var emptyState: some View {
+        VStack {
+            Spacer()
+            ContentUnavailableView {
+                Label("No Keybindings", systemImage: "keyboard")
+            } description: {
+                Text("This config file has no bind lines.")
+            } actions: {
+                Button("Restore Default Keybindings") { model.restoreDefaults() }
+                    .buttonStyle(.borderedProminent)
+            }
+            Spacer()
+        }
+    }
+
     private var footer: some View {
         HStack {
-            Text("Edits write straight to hyprmac.conf — comments and $variables are preserved.")
+            Label("Edits write straight to hyprmac.conf — comments and $variables are preserved.",
+                  systemImage: "checkmark.seal")
                 .font(.caption)
                 .foregroundStyle(.secondary)
             Spacer()
-            Button("Open Config File") { model.openConfigFile() }
+            Button {
+                model.openConfigFile()
+            } label: {
+                Label("Open Config File", systemImage: "doc.text")
+            }
         }
-        .padding()
+        .padding(.horizontal, 20)
+        .padding(.vertical, 12)
+        .background(.bar)
+    }
+}
+
+/// Small tinted rounded-square icon, System Settings style.
+private struct IconTile: View {
+    let symbol: String
+    let tint: Color
+
+    var body: some View {
+        Image(systemName: symbol)
+            .font(.system(size: 13, weight: .semibold))
+            .foregroundStyle(.white)
+            .frame(width: 27, height: 27)
+            .background(RoundedRectangle(cornerRadius: 6.5, style: .continuous)
+                .fill(tint.gradient))
     }
 }
 
@@ -323,42 +471,63 @@ private struct BindRow: View {
     let index: Int
     let bind: Keybind
     let conflicted: Bool
+    @State private var hovering = false
+
+    private var kind: DispatcherKind { DispatcherKind(bind.dispatcher) }
 
     var body: some View {
-        HStack(spacing: 10) {
+        HStack(spacing: 12) {
             shortcutChip
+                .frame(width: 92, alignment: .center)
+            IconTile(symbol: kind.symbol, tint: kind.tint)
+            kindPicker
+            argumentEditor
+            Spacer(minLength: 8)
             if conflicted {
                 Image(systemName: "exclamationmark.triangle.fill")
                     .foregroundStyle(.yellow)
                     .help("Another binding uses this shortcut")
             }
-            kindPicker
-            argumentEditor
-            Spacer()
             Button {
                 model.delete(at: index)
             } label: {
-                Image(systemName: "minus.circle")
+                Image(systemName: "trash")
+                    .foregroundStyle(.secondary)
             }
             .buttonStyle(.borderless)
+            .opacity(hovering ? 1 : 0)
             .help("Delete binding")
         }
-        .padding(8)
-        .background(RoundedRectangle(cornerRadius: 8).fill(Color.primary.opacity(0.05)))
+        .padding(.horizontal, 14)
+        .padding(.vertical, 8)
+        .contentShape(Rectangle())
+        .onHover { hovering = $0 }
     }
+
+    private var recordingThis: Bool { model.recording == .row(index) }
 
     private var shortcutChip: some View {
         Button {
             model.startRecording(.row(index))
         } label: {
-            Text(model.recording == .row(index) ? "Press shortcut…" : prettyShortcut)
-                .font(.system(.body, design: .monospaced))
+            Text(recordingThis ? "⌨ …" : prettyShortcut)
+                .font(.system(size: 13, weight: .semibold, design: .rounded))
+                .monospaced()
+                .lineLimit(1)
                 .padding(.horizontal, 10)
-                .padding(.vertical, 4)
-                .background(RoundedRectangle(cornerRadius: 6)
-                    .fill(model.recording == .row(index)
-                          ? Color.orange.opacity(0.25)
-                          : Color.accentColor.opacity(0.15)))
+                .padding(.vertical, 5)
+                .frame(minWidth: 64)
+                .background(
+                    RoundedRectangle(cornerRadius: 7, style: .continuous)
+                        .fill(recordingThis
+                              ? AnyShapeStyle(Color.orange.opacity(0.22))
+                              : AnyShapeStyle(.background)))
+                .overlay(
+                    RoundedRectangle(cornerRadius: 7, style: .continuous)
+                        .strokeBorder(recordingThis
+                                      ? Color.orange.opacity(0.8)
+                                      : Color.primary.opacity(0.18)))
+                .shadow(color: .black.opacity(0.18), radius: 0.5, y: 1)
         }
         .buttonStyle(.plain)
         .help("Click, then press the new shortcut")
@@ -398,7 +567,7 @@ private struct BindRow: View {
             CommitTextField(placeholder: "shell command", initial: command) { text in
                 model.update(at: index) { $0.dispatcher = .exec(text) }
             }
-            .frame(minWidth: 180)
+            .frame(minWidth: 180, maxWidth: 340)
 
         case .movefocus(let direction):
             directionPicker(Binding(
@@ -490,17 +659,26 @@ final class KeybindingsWindowController {
     func show() {
         if window == nil {
             let window = NSWindow(
-                contentRect: NSRect(x: 0, y: 0, width: 720, height: 500),
+                contentRect: NSRect(x: 0, y: 0, width: 780, height: 560),
                 styleMask: [.titled, .closable, .resizable],
                 backing: .buffered, defer: false)
             window.title = "hyprmac Keybindings"
             window.isReleasedWhenClosed = false
             window.contentViewController = NSHostingController(
                 rootView: KeybindingsView(model: model))
-            window.center()
             self.window = window
         }
         model.refresh()
+        // Always open dead-center of the screen with the mouse (the one whose
+        // menu bar icon was clicked).
+        if let window, let screen = NSScreen.screens.first(where: {
+            $0.frame.contains(NSEvent.mouseLocation)
+        }) ?? NSScreen.main {
+            let frame = window.frame
+            window.setFrameOrigin(NSPoint(
+                x: screen.visibleFrame.midX - frame.width / 2,
+                y: screen.visibleFrame.midY - frame.height / 2))
+        }
         window?.makeKeyAndOrderFront(nil)
         NSApp.activate()
     }
