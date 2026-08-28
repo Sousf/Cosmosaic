@@ -33,9 +33,11 @@ On first launch, grant the Accessibility permission when asked
 (System Settings → Privacy & Security → Accessibility → enable hyprmac).
 The onboarding window closes itself once granted and tiling starts.
 
-Note: the build is ad-hoc signed. macOS ties the Accessibility grant to the
-code signature, so after rebuilding you may need to re-toggle the permission.
-Proper distribution needs a Developer ID certificate + notarization.
+Signing: the build script signs with a local `hyprmac-dev` certificate when
+one exists in the keychain, so the Accessibility grant survives rebuilds.
+Without it, builds are ad-hoc signed and macOS demands a fresh grant after
+every rebuild (remove the entry with −, re-add, toggle on — toggling alone is
+not enough). Proper distribution needs Developer ID + notarization.
 
 ## Configuration
 
