@@ -33,14 +33,31 @@ final class TilingController {
 
     func setPaused(_ paused: Bool) {
         self.paused = paused
-        if !paused { relayout() }
+        if !paused {
+            adoptUntracked()
+            relayout()
+        }
         onStateChanged?()
+    }
+
+    /// Windows that appeared while tiling was paused were registered by the
+    /// window manager but never entered workspace state; adopt them on resume.
+    private func adoptUntracked() {
+        for managed in windowManager.windows.values
+        where state.workspace(of: managed.id) == nil {
+            track(managed)
+        }
     }
 
     // MARK: - Window events
 
     private func windowAdded(_ managed: WindowManager.Managed) {
         guard !paused else { return }
+        track(managed)
+        relayout()
+    }
+
+    private func track(_ managed: WindowManager.Managed) {
         let floating = shouldFloat(appName: managed.appName)
         let frame = AX.frame(of: managed.element) ?? .zero
         let screen = Screens.screenContaining(axPoint: CGPoint(x: frame.midX, y: frame.midY))
@@ -50,7 +67,6 @@ final class TilingController {
         state.add(managed.id, toWorkspace: state.current,
                   screen: Screens.key(for: screen),
                   floating: floating, after: windowManager.focusedID)
-        relayout()
     }
 
     private func windowRemoved(_ id: WindowID) {
