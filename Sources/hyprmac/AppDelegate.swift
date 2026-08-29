@@ -99,16 +99,27 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         }
     }
 
+    private var borderRecheck: DispatchWorkItem?
+
     private func refreshBorder() {
+        borderRecheck?.cancel()
         guard !controller.paused,
               let focusedID = windowManager.focusedID,
               let managed = windowManager.windows[focusedID],
               controller.state.workspace(of: focusedID) == controller.state.current,
-              let frame = AX.frame(of: managed.element),
-              // Never draw around a buried window — a border hovering over
-              // whatever covers its window is worse than no border.
-              AX.isFrameFrontmost(frame, pid: managed.pid) else {
+              let frame = AX.frame(of: managed.element) else {
             borderOverlay.hide()
+            return
+        }
+        // Never draw around a buried window — a border hovering over
+        // whatever covers its window is worse than no border. But burial is
+        // often transient (a fresh window or raise hasn't reached the
+        // WindowServer's list yet), so recheck until it surfaces.
+        guard AX.isFrameFrontmost(frame, pid: managed.pid) else {
+            borderOverlay.hide()
+            let work = DispatchWorkItem { [weak self] in self?.refreshBorder() }
+            borderRecheck = work
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.25, execute: work)
             return
         }
         borderOverlay.update(around: frame,
