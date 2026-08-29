@@ -68,14 +68,14 @@ final class StatusMenu: NSObject, NSMenuDelegate {
             open.target = self
             menu.addItem(open)
             menu.addItem(.separator())
-            let quit = NSMenuItem(title: "Quit hyprmac", action: #selector(quit),
+            let quit = NSMenuItem(title: "Quit Cosmosaic", action: #selector(quit),
                                   keyEquivalent: "")
             quit.target = self
             menu.addItem(quit)
             return
         }
 
-        menu.addItem(withTitle: "hyprmac — workspace \(controller.state.current)",
+        menu.addItem(withTitle: "Cosmosaic — workspace \(controller.state.current)",
                      action: nil, keyEquivalent: "")
 
         let keybindings = NSMenuItem(title: "Keybindings…",
@@ -116,7 +116,7 @@ final class StatusMenu: NSObject, NSMenuDelegate {
         menu.addItem(edit)
 
         menu.addItem(.separator())
-        let quit = NSMenuItem(title: "Quit hyprmac", action: #selector(quit),
+        let quit = NSMenuItem(title: "Quit Cosmosaic", action: #selector(quit),
                               keyEquivalent: "")
         quit.target = self
         menu.addItem(quit)

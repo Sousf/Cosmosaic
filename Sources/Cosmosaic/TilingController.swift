@@ -1,5 +1,5 @@
 import AppKit
-import HyprmacCore
+import CosmosaicCore
 
 /// Orchestrates everything: reacts to window events, keeps workspace state,
 /// computes layouts, and applies frames through AX. All dispatcher execution

@@ -1,6 +1,6 @@
 import AppKit
 import ApplicationServices
-import HyprmacCore
+import CosmosaicCore
 
 /// Discovers windows and watches AX events. Owns the WindowID registry and
 /// emits add/remove/focus events; it makes no layout decisions itself.
@@ -24,7 +24,7 @@ final class WindowManager {
     var onWindowAdded: ((Managed, _ isNew: Bool) -> Void)?
     var onWindowRemoved: ((WindowID) -> Void)?
     var onFocusChanged: ((WindowID?) -> Void)?
-    /// The window moved or resized outside hyprmac's control (user drag).
+    /// The window moved or resized outside Cosmosaic's control (user drag).
     var onWindowMoved: ((WindowID) -> Void)?
 
     func start() {

@@ -1,13 +1,13 @@
 import Foundation
-import HyprmacCore
+import CosmosaicCore
 
-/// Loads ~/.config/hyprmac/hyprmac.conf, writes the default on first run, and
+/// Loads ~/.config/cosmosaic/cosmosaic.conf, writes the default on first run, and
 /// hot-reloads on change. A broken config keeps the last good one running.
 @MainActor
 final class ConfigManager {
 
     static let defaultConfigText = """
-    # hyprmac — Hyprland-like tiling for macOS
+    # Cosmosaic — Hyprland-like tiling for macOS
     # Syntax follows hyprland.conf; see https://wiki.hyprland.org
     # ALT is the Option key. SUPER is Command (careful: SUPER binds shadow
     # standard macOS shortcuts like Cmd+Q).
@@ -95,8 +95,8 @@ final class ConfigManager {
     """
 
     let configDirectory = FileManager.default.homeDirectoryForCurrentUser
-        .appendingPathComponent(".config/hyprmac")
-    var configURL: URL { configDirectory.appendingPathComponent("hyprmac.conf") }
+        .appendingPathComponent(".config/cosmosaic")
+    var configURL: URL { configDirectory.appendingPathComponent("cosmosaic.conf") }
 
     private(set) var config = Config()
     private(set) var lastError: ConfigError?
@@ -117,7 +117,15 @@ final class ConfigManager {
         guard !fm.fileExists(atPath: configURL.path) else { return }
         do {
             try fm.createDirectory(at: configDirectory, withIntermediateDirectories: true)
-            try Self.defaultConfigText.write(to: configURL, atomically: true, encoding: .utf8)
+            // Migrate a config from the app's pre-rename days rather than
+            // clobbering the user's customizations with defaults.
+            let legacy = fm.homeDirectoryForCurrentUser
+                .appendingPathComponent(".config/hyprmac/hyprmac.conf")
+            if fm.fileExists(atPath: legacy.path) {
+                try fm.copyItem(at: legacy, to: configURL)
+            } else {
+                try Self.defaultConfigText.write(to: configURL, atomically: true, encoding: .utf8)
+            }
         } catch {
             lastError = ConfigError(line: 0,
                                     message: "cannot create \(configURL.path): \(error.localizedDescription)")

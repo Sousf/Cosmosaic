@@ -2,24 +2,24 @@
 import PackageDescription
 
 let package = Package(
-    name: "hyprmac",
+    name: "Cosmosaic",
     platforms: [.macOS(.v14)],
     targets: [
         // Pure logic: config parsing, layout math, action model. No AppKit/AX.
         .target(
-            name: "HyprmacCore",
-            path: "Sources/HyprmacCore"
+            name: "CosmosaicCore",
+            path: "Sources/CosmosaicCore"
         ),
         // The menu-bar app: AX services, hotkeys, window/workspace managers.
         .executableTarget(
-            name: "hyprmac",
-            dependencies: ["HyprmacCore"],
-            path: "Sources/hyprmac"
+            name: "Cosmosaic",
+            dependencies: ["CosmosaicCore"],
+            path: "Sources/Cosmosaic"
         ),
         .testTarget(
-            name: "HyprmacCoreTests",
-            dependencies: ["HyprmacCore"],
-            path: "Tests/HyprmacCoreTests"
+            name: "CosmosaicCoreTests",
+            dependencies: ["CosmosaicCore"],
+            path: "Tests/CosmosaicCoreTests"
         ),
     ]
 )

@@ -1,5 +1,5 @@
 import XCTest
-@testable import HyprmacCore
+@testable import CosmosaicCore
 
 /// Frames here use screen coordinates with top-left origin and y increasing
 /// downward (the AX/CGWindow convention): "up" means smaller y.

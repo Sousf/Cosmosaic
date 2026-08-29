@@ -1,6 +1,6 @@
 import AppKit
 import QuartzCore
-import HyprmacCore
+import CosmosaicCore
 
 /// Everything the border needs to draw itself.
 struct BorderAppearance: Equatable {

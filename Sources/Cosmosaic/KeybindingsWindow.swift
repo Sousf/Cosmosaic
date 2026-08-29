@@ -1,5 +1,5 @@
 import SwiftUI
-import HyprmacCore
+import CosmosaicCore
 
 // MARK: - Model
 
@@ -122,7 +122,7 @@ final class KeybindingsModel: ObservableObject {
     func restoreDefaults() {
         let alert = NSAlert()
         alert.messageText = "Restore default keybindings?"
-        alert.informativeText = "This replaces hyprmac.conf with the default configuration. Any custom settings in the file are overwritten."
+        alert.informativeText = "This replaces cosmosaic.conf with the default configuration. Any custom settings in the file are overwritten."
         alert.addButton(withTitle: "Restore Defaults")
         alert.addButton(withTitle: "Cancel")
         guard alert.runModal() == .alertFirstButtonReturn else { return }
@@ -369,7 +369,7 @@ struct KeybindingsView: View {
         HStack(spacing: 12) {
             VStack(alignment: .leading, spacing: 2) {
                 Text("Keybindings").font(.title2.bold())
-                Text("\(model.config.binds.count) bindings · hyprmac.conf")
+                Text("\(model.config.binds.count) bindings · cosmosaic.conf")
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }
@@ -436,7 +436,7 @@ struct KeybindingsView: View {
             Divider().padding(.leading, 56)
             settingRow(symbol: "cursorarrow.motionlines", tint: .teal,
                        title: "Focus follows mouse",
-                       subtitle: "Hover focus, Hyprland-style — saved to hyprmac.conf") {
+                       subtitle: "Hover focus, Hyprland-style — saved to cosmosaic.conf") {
                 Toggle("", isOn: Binding(
                     get: { model.followMouse },
                     set: { model.setFollowMouse($0) }))
@@ -445,7 +445,7 @@ struct KeybindingsView: View {
             Divider().padding(.leading, 56)
             settingRow(symbol: "paintbrush.fill", tint: .pink,
                        title: "Focus border",
-                       subtitle: "Style, color, and thickness (0 px hides it) — saved to hyprmac.conf") {
+                       subtitle: "Style, color, and thickness (0 px hides it) — saved to cosmosaic.conf") {
                 HStack(spacing: 12) {
                     Picker("", selection: Binding(
                         get: { model.borderStyle },
@@ -530,7 +530,7 @@ struct KeybindingsView: View {
 
     private var footer: some View {
         HStack {
-            Label("Edits write straight to hyprmac.conf — comments and $variables are preserved.",
+            Label("Edits write straight to cosmosaic.conf — comments and $variables are preserved.",
                   systemImage: "checkmark.seal")
                 .font(.caption)
                 .foregroundStyle(.secondary)
@@ -778,7 +778,7 @@ final class KeybindingsWindowController {
                 contentRect: NSRect(x: 0, y: 0, width: 780, height: 560),
                 styleMask: [.titled, .closable, .resizable],
                 backing: .buffered, defer: false)
-            window.title = "hyprmac Keybindings"
+            window.title = "Cosmosaic Keybindings"
             window.isReleasedWhenClosed = false
             window.contentViewController = NSHostingController(
                 rootView: KeybindingsView(model: model))

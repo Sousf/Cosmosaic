@@ -1,5 +1,5 @@
 import AppKit
-import HyprmacCore
+import CosmosaicCore
 
 @MainActor
 final class AppDelegate: NSObject, NSApplicationDelegate {

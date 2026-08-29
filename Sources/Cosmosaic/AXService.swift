@@ -71,7 +71,7 @@ enum AX {
         (copyAttribute(element, kAXMinimizedAttribute) as CFBoolean?) == kCFBooleanTrue
     }
 
-    /// A window hyprmac should tile: a standard, non-minimized window.
+    /// A window Cosmosaic should tile: a standard, non-minimized window.
     static func isStandardWindow(_ element: AXUIElement) -> Bool {
         role(element) == kAXWindowRole
             && subrole(element) == kAXStandardWindowSubrole

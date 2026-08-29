@@ -36,23 +36,23 @@ final class PermissionOnboarding {
         let window = NSWindow(
             contentRect: NSRect(x: 0, y: 0, width: 460, height: 320),
             styleMask: [.titled, .closable], backing: .buffered, defer: false)
-        window.title = "Welcome to hyprmac"
+        window.title = "Welcome to Cosmosaic"
         window.center()
         window.isReleasedWhenClosed = false
         // Stay above normal windows so this can't get buried and forgotten.
         window.level = .floating
 
         let text = NSTextField(wrappingLabelWithString: """
-        hyprmac tiles your windows the way Hyprland does on Linux. To move and \
+        Cosmosaic tiles your windows the way Hyprland does on Linux. To move and \
         resize other apps' windows, macOS requires you to grant it the \
         Accessibility permission:
 
         1. Open System Settings → Privacy & Security → Accessibility
-        2. Enable hyprmac in the list
+        2. Enable Cosmosaic in the list
 
         Already enabled but this window is still here? The app was rebuilt, \
         which invalidates the old grant even though the switch still shows on. \
-        Remove hyprmac from the list with the − button, then relaunch the app \
+        Remove Cosmosaic from the list with the − button, then relaunch the app \
         and grant it again.
 
         This window closes by itself once the permission is granted.

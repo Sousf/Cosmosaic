@@ -1,5 +1,5 @@
 import AppKit
-import HyprmacCore
+import CosmosaicCore
 
 typealias ScreenKey = UInt32
 

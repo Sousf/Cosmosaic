@@ -1,6 +1,6 @@
 import Carbon.HIToolbox
 import AppKit
-import HyprmacCore
+import CosmosaicCore
 
 /// Registers global hotkeys with Carbon's RegisterEventHotKey — no extra
 /// permissions needed, and bound keys are consumed before reaching apps.

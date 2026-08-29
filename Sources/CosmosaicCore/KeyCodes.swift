@@ -2,7 +2,7 @@ import Foundation
 
 /// Config key names → Carbon virtual key codes (ANSI layout, kVK_ constants),
 /// and modifier sets → Carbon hotkey modifier flags. The numeric values are
-/// ABI-stable; hardcoding them keeps HyprmacCore free of Carbon imports.
+/// ABI-stable; hardcoding them keeps CosmosaicCore free of Carbon imports.
 public enum KeyCodes {
 
     private static let table: [String: UInt32] = [

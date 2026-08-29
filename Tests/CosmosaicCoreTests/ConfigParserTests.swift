@@ -1,5 +1,5 @@
 import XCTest
-@testable import HyprmacCore
+@testable import CosmosaicCore
 
 final class ConfigParserTests: XCTestCase {
 

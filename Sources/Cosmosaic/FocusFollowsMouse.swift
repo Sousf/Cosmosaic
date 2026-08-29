@@ -2,7 +2,7 @@ import AppKit
 
 /// Hyprland-style hover focus: a global mouse-move monitor hit-tests the
 /// pointer and focuses the window underneath. Global monitors exclude our own
-/// app's events, so hovering hyprmac's windows never steals focus, and mouse
+/// app's events, so hovering Cosmosaic's windows never steals focus, and mouse
 /// monitors need no extra permissions.
 @MainActor
 final class FocusFollowsMouse {
