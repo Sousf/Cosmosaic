@@ -3,11 +3,16 @@ import XCTest
 
 final class LaunchCommandTests: XCTestCase {
 
-    func testExecForAppQuotesName() {
+    func testExecForAppLaunchesNewInstance() {
         XCTAssertEqual(LaunchCommand.exec(forApp: "Google Chrome"),
-                       "open -a \"Google Chrome\"")
+                       "open -n -a \"Google Chrome\"")
         XCTAssertEqual(LaunchCommand.exec(forApp: "Safari"),
-                       "open -a \"Safari\"")
+                       "open -n -a \"Safari\"")
+    }
+
+    func testAppNameFromNewInstanceExec() {
+        XCTAssertEqual(LaunchCommand.appName(fromExec: "open -n -a \"Ghostty\""),
+                       "Ghostty")
     }
 
     func testAppNameFromQuotedExec() {

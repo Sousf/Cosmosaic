@@ -118,23 +118,36 @@ final class KeybindingsModel: ObservableObject {
         refreshToken = UUID()
     }
 
-    /// Names of installed .app bundles for the launch-command picker.
-    @Published private(set) var installedApps: [String] = []
+    struct InstalledApp: Identifiable, Hashable {
+        let name: String
+        let path: String
+        var id: String { path }
+    }
+
+    /// Installed .app bundles for the launch-command picker.
+    @Published private(set) var installedApps: [InstalledApp] = []
+
+    func installedApp(named name: String) -> InstalledApp? {
+        installedApps.first { $0.name == name }
+    }
 
     private func loadInstalledApps() {
         let fm = FileManager.default
         let directories = ["/Applications", "/Applications/Utilities",
                            "/System/Applications", "/System/Applications/Utilities",
                            NSHomeDirectory() + "/Applications"]
-        var names: Set<String> = []
+        var seen: Set<String> = []
+        var apps: [InstalledApp] = []
         for directory in directories {
             for entry in (try? fm.contentsOfDirectory(atPath: directory)) ?? []
             where entry.hasSuffix(".app") {
-                names.insert(String(entry.dropLast(4)))
+                let name = String(entry.dropLast(4))
+                guard seen.insert(name).inserted else { continue }
+                apps.append(InstalledApp(name: name, path: "\(directory)/\(entry)"))
             }
         }
-        installedApps = names.sorted {
-            $0.localizedCaseInsensitiveCompare($1) == .orderedAscending
+        installedApps = apps.sorted {
+            $0.name.localizedCaseInsensitiveCompare($1.name) == .orderedAscending
         }
     }
 
@@ -756,16 +769,15 @@ private struct BindRow: View {
     }
 }
 
-/// Launch-command editor: an installed-app picker writing `open -a "App"`,
-/// with a Custom Command escape hatch for raw shell (scripts, URLs).
+/// Launch-command editor: a searchable app picker (with icons) writing
+/// `open -n -a "App"`, plus a Custom Command escape hatch for raw shell.
 private struct ExecEditor: View {
     @ObservedObject var model: KeybindingsModel
     let index: Int
     let command: String
 
-    private static let customTag = "\u{1}custom"
-
     @State private var customMode: Bool
+    @State private var showPicker = false
 
     init(model: KeybindingsModel, index: Int, command: String) {
         self.model = model
@@ -779,37 +791,43 @@ private struct ExecEditor: View {
         LaunchCommand.appName(fromExec: command)
     }
 
-    /// Installed apps, plus the currently selected one if it's not installed
-    /// anymore (so the picker still shows it instead of going blank).
-    private var options: [String] {
-        guard let selectedApp, !model.installedApps.contains(selectedApp) else {
-            return model.installedApps
-        }
-        return ([selectedApp] + model.installedApps)
-    }
-
     var body: some View {
         HStack(spacing: 8) {
-            Picker("", selection: Binding(
-                get: { customMode ? Self.customTag : (selectedApp ?? Self.customTag) },
-                set: { choice in
-                    if choice == Self.customTag {
-                        customMode = true
+            Button {
+                showPicker = true
+            } label: {
+                HStack(spacing: 6) {
+                    if !customMode, let name = selectedApp,
+                       let app = model.installedApp(named: name) {
+                        Image(nsImage: NSWorkspace.shared.icon(forFile: app.path))
+                            .resizable()
+                            .frame(width: 18, height: 18)
+                        Text(name).lineLimit(1)
+                    } else if !customMode, let name = selectedApp {
+                        Text(name).lineLimit(1)
                     } else {
-                        customMode = false
-                        model.update(at: index) {
-                            $0.dispatcher = .exec(LaunchCommand.exec(forApp: choice))
-                        }
+                        Image(systemName: "terminal")
+                            .foregroundStyle(.secondary)
+                        Text("Custom Command").foregroundStyle(.secondary)
                     }
-                })) {
-                ForEach(options, id: \.self) { app in
-                    Text(app).tag(app)
+                    Image(systemName: "chevron.up.chevron.down")
+                        .font(.system(size: 9))
+                        .foregroundStyle(.secondary)
                 }
-                Divider()
-                Text("Custom Command…").tag(Self.customTag)
             }
-            .labelsHidden()
-            .frame(width: 190)
+            .frame(minWidth: 150, alignment: .leading)
+            .popover(isPresented: $showPicker, arrowEdge: .bottom) {
+                AppPickerView(apps: model.installedApps) { app in
+                    customMode = false
+                    showPicker = false
+                    model.update(at: index) {
+                        $0.dispatcher = .exec(LaunchCommand.exec(forApp: app.name))
+                    }
+                } onSelectCustom: {
+                    customMode = true
+                    showPicker = false
+                }
+            }
 
             if customMode {
                 CommitTextField(placeholder: "shell command", initial: command) { text in
@@ -818,6 +836,76 @@ private struct ExecEditor: View {
                 .frame(minWidth: 140, maxWidth: 260)
             }
         }
+    }
+}
+
+/// Search-first app chooser: type to filter, click to pick.
+private struct AppPickerView: View {
+    let apps: [KeybindingsModel.InstalledApp]
+    let onSelectApp: (KeybindingsModel.InstalledApp) -> Void
+    let onSelectCustom: () -> Void
+
+    @State private var query = ""
+    @FocusState private var searchFocused: Bool
+
+    private var filtered: [KeybindingsModel.InstalledApp] {
+        guard !query.isEmpty else { return apps }
+        return apps.filter { $0.name.localizedCaseInsensitiveContains(query) }
+    }
+
+    var body: some View {
+        VStack(spacing: 0) {
+            HStack(spacing: 6) {
+                Image(systemName: "magnifyingglass").foregroundStyle(.secondary)
+                TextField("Search apps…", text: $query)
+                    .textFieldStyle(.plain)
+                    .focused($searchFocused)
+                    .onSubmit {
+                        if let first = filtered.first { onSelectApp(first) }
+                    }
+            }
+            .padding(10)
+            Divider()
+            ScrollView {
+                LazyVStack(spacing: 0) {
+                    ForEach(filtered) { app in
+                        Button {
+                            onSelectApp(app)
+                        } label: {
+                            HStack(spacing: 8) {
+                                Image(nsImage: NSWorkspace.shared.icon(forFile: app.path))
+                                    .resizable()
+                                    .frame(width: 22, height: 22)
+                                Text(app.name).lineLimit(1)
+                                Spacer()
+                            }
+                            .padding(.horizontal, 10)
+                            .padding(.vertical, 5)
+                            .contentShape(Rectangle())
+                        }
+                        .buttonStyle(.plain)
+                    }
+                    if filtered.isEmpty {
+                        Text("No matching apps")
+                            .foregroundStyle(.secondary)
+                            .padding(.vertical, 20)
+                    }
+                }
+            }
+            Divider()
+            Button(action: onSelectCustom) {
+                HStack(spacing: 8) {
+                    Image(systemName: "terminal")
+                    Text("Custom Command…")
+                    Spacer()
+                }
+                .padding(10)
+                .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+        }
+        .frame(width: 280, height: 400)
+        .onAppear { searchFocused = true }
     }
 }
 

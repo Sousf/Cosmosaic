@@ -5,16 +5,18 @@ import Foundation
 /// plain Hyprland `exec` lines.
 public enum LaunchCommand {
 
+    /// `-n` launches a fresh instance instead of refocusing a running one.
     public static func exec(forApp name: String) -> String {
-        "open -a \"\(name)\""
+        "open -n -a \"\(name)\""
     }
 
-    /// The app name if the command is exactly an `open -a` launch, else nil
-    /// (custom commands stay custom).
+    /// The app name if the command is exactly an `open [-n] -a` launch, else
+    /// nil (custom commands stay custom).
     public static func appName(fromExec command: String) -> String? {
         let trimmed = command.trimmingCharacters(in: .whitespaces)
-        guard trimmed.hasPrefix("open -a ") else { return nil }
-        let rest = trimmed.dropFirst("open -a ".count)
+        let prefix = ["open -n -a ", "open -a "].first { trimmed.hasPrefix($0) }
+        guard let prefix else { return nil }
+        let rest = trimmed.dropFirst(prefix.count)
             .trimmingCharacters(in: .whitespaces)
         guard !rest.isEmpty else { return nil }
 

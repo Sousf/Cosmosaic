@@ -71,6 +71,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         island.model.onPlayPause = { [weak self] in self?.media.playPause() }
         island.model.onNext = { [weak self] in self?.media.nextTrack() }
         island.model.onPrevious = { [weak self] in self?.media.previousTrack() }
+        island.model.onSelectWorkspace = { [weak self] number in
+            self?.controller.switchWorkspace(to: number)
+        }
         media.onUpdate = { [weak self] nowPlaying in
             guard let self else { return }
             self.island.model.nowPlaying = nowPlaying
@@ -101,6 +104,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             self.statusMenu.refresh()
             self.keybindingsModel.setTilingPaused(self.controller.paused)
             self.island.model.workspace = self.controller.state.current
+            self.island.model.occupiedWorkspaces = Set(
+                self.controller.state.workspaces.compactMap {
+                    $0.value.allWindows.isEmpty ? nil : $0.key
+                })
+            self.island.noteContentChanged()
             self.refreshBorder()
         }
 

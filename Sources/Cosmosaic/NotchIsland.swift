@@ -11,15 +11,26 @@ final class IslandModel: ObservableObject {
     /// zero means no notch — render as a compact pill instead.
     @Published var notchGap: CGFloat = 0
 
-    /// Collapsed wing widths: the right wing grows to carry the track title
-    /// when media is loaded, Dynamic-Island-style.
-    var leftWingWidth: CGFloat { 44 }
+    /// Workspaces that currently hold windows; the current one always shows.
+    @Published var occupiedWorkspaces: Set<Int> = []
+
+    /// Workspaces in the collapsed strip: occupied plus current, sorted.
+    var visibleWorkspaces: [Int] {
+        occupiedWorkspaces.union([workspace]).sorted()
+    }
+
+    /// Collapsed wing widths: both wings grow with their content —
+    /// workspace strip on the left, track title on the right.
+    var leftWingWidth: CGFloat {
+        max(44, CGFloat(visibleWorkspaces.count) * 17 + 14)
+    }
     var rightWingWidth: CGFloat { nowPlaying == nil ? 44 : 172 }
 
     var onHoverChanged: ((Bool) -> Void)?
     var onPlayPause: (() -> Void)?
     var onNext: (() -> Void)?
     var onPrevious: (() -> Void)?
+    var onSelectWorkspace: ((Int) -> Void)?
 }
 
 /// A Dynamic-Island-style black panel hugging the notch (or a top-center
@@ -63,10 +74,10 @@ final class NotchIsland {
                       width: width, height: 24)
     }
 
-    /// Re-fit the collapsed strip when its content changes (track appears
-    /// or goes away) — no-op while expanded.
+    /// Re-fit the collapsed strip when its content changes (track appears,
+    /// workspace occupancy shifts) — no-op while expanded or unchanged.
     func noteContentChanged() {
-        guard panel != nil, !model.expanded else { return }
+        guard let panel, !model.expanded, panel.frame != collapsedFrame else { return }
         animate(to: collapsedFrame)
     }
 
@@ -161,11 +172,19 @@ private struct IslandView: View {
 
     private var collapsed: some View {
         HStack(spacing: 0) {
-            Text("\(model.workspace)")
-                .font(.system(size: 13, weight: .bold, design: .rounded))
-                .monospacedDigit()
-                .foregroundStyle(.white)
-                .frame(width: model.notchGap > 0 ? model.leftWingWidth : nil)
+            HStack(spacing: 5) {
+                ForEach(model.visibleWorkspaces, id: \.self) { number in
+                    Text("\(number)")
+                        .font(.system(size: 12,
+                                      weight: number == model.workspace ? .bold : .medium,
+                                      design: .rounded))
+                        .monospacedDigit()
+                        .foregroundStyle(number == model.workspace
+                                         ? AnyShapeStyle(.white)
+                                         : AnyShapeStyle(.gray))
+                }
+            }
+            .frame(width: model.notchGap > 0 ? model.leftWingWidth : nil)
             if model.notchGap > 0 {
                 // Hollow center: the physical notch lives here.
                 Spacer().frame(width: model.notchGap)
@@ -196,10 +215,24 @@ private struct IslandView: View {
 
     private var expanded: some View {
         VStack(spacing: 10) {
-            HStack {
-                Label("Workspace \(model.workspace)", systemImage: "square.grid.3x3.middle.filled")
-                    .font(.caption.weight(.semibold))
-                    .foregroundStyle(.white.opacity(0.85))
+            HStack(spacing: 6) {
+                ForEach(1...9, id: \.self) { number in
+                    let occupied = model.occupiedWorkspaces.contains(number)
+                    Button {
+                        model.onSelectWorkspace?(number)
+                    } label: {
+                        Text("\(number)")
+                            .font(.system(size: 11, weight: .semibold, design: .rounded))
+                            .monospacedDigit()
+                            .foregroundStyle(number == model.workspace ? .black
+                                             : occupied ? .white : Color.gray.opacity(0.6))
+                            .frame(width: 22, height: 18)
+                            .background(RoundedRectangle(cornerRadius: 5)
+                                .fill(number == model.workspace ? Color.white
+                                      : Color.white.opacity(occupied ? 0.18 : 0.06)))
+                    }
+                    .buttonStyle(.plain)
+                }
                 Spacer()
                 if let nowPlaying = model.nowPlaying {
                     Text(nowPlaying.player.rawValue)
