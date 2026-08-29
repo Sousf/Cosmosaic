@@ -58,10 +58,44 @@ final class TilingController {
 
     // MARK: - Window events
 
+    /// Ease every affected window from its live frame to its new tree frame
+    /// — window opens and closes flow instead of snapping. Falls back to an
+    /// instant relayout when animation is off, nothing moved, or too many
+    /// windows would animate at once (AX can't sustain it smoothly).
+    private func animateLayoutChange() {
+        guard !paused else { return }
+        guard animationDuration > 0 else {
+            relayout()
+            return
+        }
+        let fullscreenID = state.currentWorkspace.fullscreen
+        var items: [WindowAnimator.Item] = []
+        for (id, target) in currentTiledFrames() where id != fullscreenID {
+            guard let managed = windowManager.windows[id],
+                  let live = AX.frame(of: managed.element) else { continue }
+            let moved = abs(live.origin.x - target.origin.x) > 1
+                || abs(live.origin.y - target.origin.y) > 1
+                || abs(live.width - target.width) > 1
+                || abs(live.height - target.height) > 1
+            if moved {
+                items.append(WindowAnimator.Item(
+                    element: managed.element, from: live, to: target,
+                    isFocused: id == windowManager.focusedID))
+            }
+        }
+        guard !items.isEmpty, items.count <= 5 else {
+            relayout()
+            return
+        }
+        animator.animate(items, durationMs: animationDuration) { [weak self] in
+            self?.relayout()
+        }
+    }
+
     private func windowAdded(_ managed: WindowManager.Managed, isNew: Bool) {
         guard !paused else { return }
         track(managed)
-        relayout()
+        animateLayoutChange()
         // Hyprland rule: a brand-new window takes focus. Enforce it instead
         // of hoping macOS reports it (activation events race window creation).
         // Except in fullscreen, where nothing may take over the screen.
@@ -94,7 +128,7 @@ final class TilingController {
         // it before removal so focus can fall to whatever reclaims that space.
         let oldFrame = wasOnCurrentWorkspace ? currentTiledFrames()[id] : nil
         state.remove(id)
-        relayout()
+        animateLayoutChange()
 
         // macOS only refocuses within the closed window's own app; a tiler
         // must hand focus to the nearest workspace neighbor itself.
