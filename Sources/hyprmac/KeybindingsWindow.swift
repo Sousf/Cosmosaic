@@ -41,6 +41,22 @@ final class KeybindingsModel: ObservableObject {
     }
 
     var activeBorderColor: ConfigColor { config.general.activeBorderColor }
+    /// Pending value shown while a debounced write is in flight, so rapid
+    /// stepper clicks accumulate instead of re-reading the stale config.
+    @Published private var pendingBorderSize: Int?
+    var borderSize: Int { pendingBorderSize ?? config.general.borderSize }
+
+    private var borderSizeDebounce: DispatchWorkItem?
+
+    func setBorderSize(_ size: Int) {
+        pendingBorderSize = size
+        borderSizeDebounce?.cancel()
+        let work = DispatchWorkItem { [weak self] in
+            self?.configManager.setBorderSize(size)
+        }
+        borderSizeDebounce = work
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.2, execute: work)
+    }
 
     private var colorDebounce: DispatchWorkItem?
 
@@ -62,6 +78,7 @@ final class KeybindingsModel: ObservableObject {
     func refresh() {
         config = configManager.config
         axTrusted = AX.isTrusted
+        pendingBorderSize = nil
         refreshToken = UUID()
     }
 
@@ -392,13 +409,22 @@ struct KeybindingsView: View {
             }
             Divider().padding(.leading, 56)
             settingRow(symbol: "paintbrush.fill", tint: .pink,
-                       title: "Focus border color",
-                       subtitle: "Drawn around the focused window — saved to hyprmac.conf") {
-                ColorPicker("", selection: Binding(
-                    get: { Color(configColor: model.activeBorderColor) },
-                    set: { model.setActiveBorderColor(ConfigColor(color: $0)) }),
-                    supportsOpacity: true)
-                    .labelsHidden()
+                       title: "Focus border",
+                       subtitle: "Color and thickness (0 px hides it) — saved to hyprmac.conf") {
+                HStack(spacing: 12) {
+                    ColorPicker("", selection: Binding(
+                        get: { Color(configColor: model.activeBorderColor) },
+                        set: { model.setActiveBorderColor(ConfigColor(color: $0)) }),
+                        supportsOpacity: true)
+                        .labelsHidden()
+                    Stepper(value: Binding(
+                        get: { model.borderSize },
+                        set: { model.setBorderSize($0) }), in: 0...12) {
+                        Text("\(model.borderSize) px")
+                            .monospacedDigit()
+                            .frame(minWidth: 36, alignment: .trailing)
+                    }
+                }
             }
         }
     }

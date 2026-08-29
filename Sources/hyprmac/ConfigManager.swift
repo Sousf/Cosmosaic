@@ -160,6 +160,14 @@ final class ConfigManager {
                                            value: color.rgbaText))
     }
 
+    /// Persist the focus-border thickness (0 hides the border).
+    func setBorderSize(_ size: Int) {
+        guard let text = fileText() else { return }
+        write(text: ConfigEditor.setOption(in: text, block: "general",
+                                           key: "border_size",
+                                           value: String(size)))
+    }
+
     /// Current raw file text, for UI-driven surgical edits.
     func fileText() -> String? {
         try? String(contentsOf: configURL, encoding: .utf8)
