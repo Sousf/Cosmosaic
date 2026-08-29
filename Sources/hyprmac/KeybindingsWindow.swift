@@ -679,7 +679,10 @@ final class KeybindingsWindowController {
                 x: screen.visibleFrame.midX - frame.width / 2,
                 y: screen.visibleFrame.midY - frame.height / 2))
         }
-        window?.makeKeyAndOrderFront(nil)
         NSApp.activate()
+        window?.makeKeyAndOrderFront(nil)
+        // Accessory apps can be denied activation (cooperative activation),
+        // which would leave the window ordered behind the active app's tiles.
+        window?.orderFrontRegardless()
     }
 }
