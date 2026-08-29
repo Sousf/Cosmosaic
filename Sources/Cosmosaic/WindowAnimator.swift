@@ -1,10 +1,12 @@
 import AppKit
+import ApplicationServices
 import QuartzCore
 
 /// Animates window frames through AX, paced by a display link (120Hz on
-/// ProMotion) with ease-in-out — the float-over feel for swaps and
-/// fullscreen transitions. Scoped to one or two windows at a time;
-/// whole-layout changes stay instant by design.
+/// ProMotion) with ease-in-out. The link only computes frames; the blocking
+/// AX writes run on per-window background queues with latest-frame
+/// coalescing, so a slow app drops its own frames instead of stalling the
+/// other windows or the tick loop.
 @MainActor
 final class WindowAnimator: NSObject {
 
@@ -14,9 +16,29 @@ final class WindowAnimator: NSObject {
         let to: CGRect
         let isFocused: Bool
 
-        /// Same-size moves need only one AX call per tick.
         var resizes: Bool {
             abs(from.width - to.width) > 0.5 || abs(from.height - to.height) > 0.5
+        }
+    }
+
+    /// AXUIElement is a thread-safe CFType; this wrapper carries it into the
+    /// writer queues past Sendable checking.
+    private struct ElementHandle: @unchecked Sendable {
+        let element: AXUIElement
+    }
+
+    @MainActor
+    private final class ItemState {
+        let item: Item
+        let queue: DispatchQueue
+        var inFlight = false
+        var latest: CGRect
+
+        init(item: Item, index: Int) {
+            self.item = item
+            self.latest = item.from
+            self.queue = DispatchQueue(label: "cosmosaic.animator.\(index)",
+                                       qos: .userInteractive)
         }
     }
 
@@ -25,7 +47,7 @@ final class WindowAnimator: NSObject {
 
     private var displayLink: CADisplayLink?
     private var completion: (() -> Void)?
-    private var items: [Item] = []
+    private var states: [ItemState] = []
     private var startTime: CFTimeInterval = 0
     private var duration: Double = 0
 
@@ -38,7 +60,7 @@ final class WindowAnimator: NSObject {
             completion()
             return
         }
-        self.items = items
+        states = items.enumerated().map { ItemState(item: $1, index: $0) }
         self.completion = completion
         startTime = CACurrentMediaTime()
         duration = Double(durationMs) / 1000.0
@@ -48,7 +70,6 @@ final class WindowAnimator: NSObject {
         link?.add(to: .main, forMode: .common)
         displayLink = link
         if link == nil {
-            // No display link available: land instantly rather than hang.
             for item in items { AX.setFrame(item.element, to: item.to) }
             finish()
         }
@@ -58,16 +79,44 @@ final class WindowAnimator: NSObject {
         MainActor.assumeIsolated {
             let progress = min(1, (CACurrentMediaTime() - startTime) / duration)
             let eased = Self.easeInOutCubic(progress)
-            for item in items {
-                let frame = Self.lerp(item.from, item.to, eased)
-                // Slim writes during flight; the finish sets exact frames.
-                if item.resizes {
-                    AX.setSize(item.element, to: frame.size)
-                }
-                AX.setPosition(item.element, to: frame.origin)
-                if item.isFocused { onFocusedFrame?(frame) }
+            for state in states {
+                let frame = Self.lerp(state.item.from, state.item.to, eased)
+                state.latest = frame
+                if state.item.isFocused { onFocusedFrame?(frame) }
+                dispatchWrite(state)
             }
             if progress >= 1 { finish() }
+        }
+    }
+
+    /// Send the newest frame to the window's writer queue unless a write is
+    /// already in flight — the next tick delivers the newer frame instead.
+    private func dispatchWrite(_ state: ItemState) {
+        guard !state.inFlight else { return }
+        state.inFlight = true
+        let handle = ElementHandle(element: state.item.element)
+        let frame = state.latest
+        let resizes = state.item.resizes
+        state.queue.async {
+            Self.applyFrame(handle, frame: frame, resizes: resizes)
+            DispatchQueue.main.async {
+                MainActor.assumeIsolated { state.inFlight = false }
+            }
+        }
+    }
+
+    /// Raw AX writes, callable off the main actor.
+    private nonisolated static func applyFrame(_ handle: ElementHandle,
+                                               frame: CGRect, resizes: Bool) {
+        var origin = frame.origin
+        var size = frame.size
+        if resizes, let sizeValue = AXValueCreate(.cgSize, &size) {
+            AXUIElementSetAttributeValue(handle.element,
+                                         kAXSizeAttribute as CFString, sizeValue)
+        }
+        if let positionValue = AXValueCreate(.cgPoint, &origin) {
+            AXUIElementSetAttributeValue(handle.element,
+                                         kAXPositionAttribute as CFString, positionValue)
         }
     }
 
@@ -77,14 +126,15 @@ final class WindowAnimator: NSObject {
         displayLink?.invalidate()
         displayLink = nil
         completion = nil
-        items = []
+        states = []
     }
 
     private func finish() {
         displayLink?.invalidate()
         displayLink = nil
-        for item in items { AX.setFrame(item.element, to: item.to) }
-        items = []
+        // Exact final frames through the robust main-actor path.
+        for state in states { AX.setFrame(state.item.element, to: state.item.to) }
+        states = []
         let done = completion
         completion = nil
         done?()
