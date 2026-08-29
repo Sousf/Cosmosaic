@@ -209,7 +209,10 @@ final class TilingController {
 
         let workspace = state.currentWorkspace
         let frames = currentTiledFrames()
-        for (id, frame) in frames {
+        // The fullscreen window stays at its fullscreen frame — applying its
+        // tree frame first and re-fullscreening after flashes it small for
+        // a frame.
+        for (id, frame) in frames where id != workspace.fullscreen {
             guard let managed = windowManager.windows[id] else { continue }
             AX.setFrame(managed.element, to: frame)
         }
