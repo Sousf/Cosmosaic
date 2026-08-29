@@ -114,7 +114,28 @@ final class KeybindingsModel: ObservableObject {
         config = configManager.config
         axTrusted = AX.isTrusted
         pendingBorderSize = nil
+        loadInstalledApps()
         refreshToken = UUID()
+    }
+
+    /// Names of installed .app bundles for the launch-command picker.
+    @Published private(set) var installedApps: [String] = []
+
+    private func loadInstalledApps() {
+        let fm = FileManager.default
+        let directories = ["/Applications", "/Applications/Utilities",
+                           "/System/Applications", "/System/Applications/Utilities",
+                           NSHomeDirectory() + "/Applications"]
+        var names: Set<String> = []
+        for directory in directories {
+            for entry in (try? fm.contentsOfDirectory(atPath: directory)) ?? []
+            where entry.hasSuffix(".app") {
+                names.insert(String(entry.dropLast(4)))
+            }
+        }
+        installedApps = names.sorted {
+            $0.localizedCaseInsensitiveCompare($1) == .orderedAscending
+        }
     }
 
     /// Replace the whole config file with the shipped defaults (confirmed
@@ -680,10 +701,7 @@ private struct BindRow: View {
     private var argumentEditor: some View {
         switch bind.dispatcher {
         case .exec(let command):
-            CommitTextField(placeholder: "shell command", initial: command) { text in
-                model.update(at: index) { $0.dispatcher = .exec(text) }
-            }
-            .frame(minWidth: 180, maxWidth: 340)
+            ExecEditor(model: model, index: index, command: command)
 
         case .movefocus(let direction):
             directionPicker(Binding(
@@ -735,6 +753,71 @@ private struct BindRow: View {
         }
         .labelsHidden()
         .frame(width: 60)
+    }
+}
+
+/// Launch-command editor: an installed-app picker writing `open -a "App"`,
+/// with a Custom Command escape hatch for raw shell (scripts, URLs).
+private struct ExecEditor: View {
+    @ObservedObject var model: KeybindingsModel
+    let index: Int
+    let command: String
+
+    private static let customTag = "\u{1}custom"
+
+    @State private var customMode: Bool
+
+    init(model: KeybindingsModel, index: Int, command: String) {
+        self.model = model
+        self.index = index
+        self.command = command
+        _customMode = State(initialValue:
+            !command.isEmpty && LaunchCommand.appName(fromExec: command) == nil)
+    }
+
+    private var selectedApp: String? {
+        LaunchCommand.appName(fromExec: command)
+    }
+
+    /// Installed apps, plus the currently selected one if it's not installed
+    /// anymore (so the picker still shows it instead of going blank).
+    private var options: [String] {
+        guard let selectedApp, !model.installedApps.contains(selectedApp) else {
+            return model.installedApps
+        }
+        return ([selectedApp] + model.installedApps)
+    }
+
+    var body: some View {
+        HStack(spacing: 8) {
+            Picker("", selection: Binding(
+                get: { customMode ? Self.customTag : (selectedApp ?? Self.customTag) },
+                set: { choice in
+                    if choice == Self.customTag {
+                        customMode = true
+                    } else {
+                        customMode = false
+                        model.update(at: index) {
+                            $0.dispatcher = .exec(LaunchCommand.exec(forApp: choice))
+                        }
+                    }
+                })) {
+                ForEach(options, id: \.self) { app in
+                    Text(app).tag(app)
+                }
+                Divider()
+                Text("Custom Command…").tag(Self.customTag)
+            }
+            .labelsHidden()
+            .frame(width: 190)
+
+            if customMode {
+                CommitTextField(placeholder: "shell command", initial: command) { text in
+                    model.update(at: index) { $0.dispatcher = .exec(text) }
+                }
+                .frame(minWidth: 140, maxWidth: 260)
+            }
+        }
     }
 }
 
