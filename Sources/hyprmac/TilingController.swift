@@ -319,6 +319,9 @@ final class TilingController {
     }
 
     private func moveFocus(_ direction: Direction) {
+        // In fullscreen there is nowhere to move focus that wouldn't raise a
+        // hidden window over the fullscreen one.
+        guard state.currentWorkspace.fullscreen == nil else { return }
         guard let focusedID = windowManager.focusedID else {
             // Nothing focused: focus anything on the current workspace.
             if let id = state.currentWorkspace.allWindows.first,
@@ -369,7 +372,9 @@ final class TilingController {
     /// App activation constantly reorders windows, so re-assert after focus
     /// and layout changes. The focused float is raised last (topmost).
     func raiseFloatingWindows() {
-        guard !paused, !dialogIsFrontmost() else { return }
+        guard !paused, !dialogIsFrontmost(),
+              // A fullscreen window owns the screen; nothing stacks above it.
+              state.currentWorkspace.fullscreen == nil else { return }
         let floating = state.currentWorkspace.floating
         guard !floating.isEmpty else { return }
         let ordered = floating.sorted {
@@ -384,6 +389,9 @@ final class TilingController {
     /// Hover focus: focus the window under the mouse without raising it.
     func hoverFocus(at axPoint: CGPoint) {
         guard !paused, config.input.followMouse else { return }
+        // Fullscreen mode: the windows tiled underneath still have frames,
+        // but hovering them must not pull them above the fullscreen window.
+        guard state.currentWorkspace.fullscreen == nil else { return }
         // A dialog is up front (save prompt, alert): hover must not bury it.
         if dialogIsFrontmost() { return }
         guard let id = windowAt(axPoint: axPoint),
