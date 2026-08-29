@@ -112,6 +112,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
               // Tiled windows only: floating windows are draggable and can
               // legitimately stack, which made their border glitchy.
               !controller.state.isFloating(focusedID),
+              // No border in fullscreen (Hyprland behavior): the window spans
+              // the whole tileable area, so an outset border would clip at
+              // the screen edges.
+              controller.state.currentWorkspace.fullscreen != focusedID,
               let frame = AX.frame(of: managed.element) else {
             borderOverlay.hide()
             return
