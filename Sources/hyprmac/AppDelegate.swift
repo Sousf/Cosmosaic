@@ -47,7 +47,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             return self.windowManager.windows[id]?.element
         }
         mouseTracker.onDragTick = { [weak self] frame in
-            guard let self, !self.controller.paused else { return }
+            guard let self, !self.controller.paused,
+                  let id = self.windowManager.focusedID,
+                  !self.controller.state.isFloating(id) else { return }
             self.borderOverlay.update(
                 around: frame,
                 appearance: BorderAppearance(general: self.controller.config.general))
@@ -107,6 +109,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
               let focusedID = windowManager.focusedID,
               let managed = windowManager.windows[focusedID],
               controller.state.workspace(of: focusedID) == controller.state.current,
+              // Tiled windows only: floating windows are draggable and can
+              // legitimately stack, which made their border glitchy.
+              !controller.state.isFloating(focusedID),
               let frame = AX.frame(of: managed.element) else {
             borderOverlay.hide()
             return
