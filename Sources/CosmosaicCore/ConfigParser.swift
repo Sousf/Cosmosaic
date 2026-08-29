@@ -115,7 +115,7 @@ extension ConfigParser {
                     throw ConfigError(line: lineNumber, message: "nested blocks are not supported")
                 }
                 let name = line.dropLast().trimmingCharacters(in: .whitespaces)
-                guard ["general", "input", "island", "animations"].contains(name) else {
+                guard ["general", "input", "animations"].contains(name) else {
                     throw ConfigError(line: lineNumber, message: "unknown block '\(name)'")
                 }
                 openBlock = (name, lineNumber)
@@ -150,13 +150,6 @@ extension ConfigParser {
                     throw ConfigError(line: lineNumber,
                                       message: "unknown animations option '\(key)'")
                 }
-                continue
-            }
-            if openBlock?.name == "island" {
-                guard key == "enabled" else {
-                    throw ConfigError(line: lineNumber, message: "unknown island option '\(key)'")
-                }
-                config.island.enabled = try parseBool(value, key: key, line: lineNumber)
                 continue
             }
 

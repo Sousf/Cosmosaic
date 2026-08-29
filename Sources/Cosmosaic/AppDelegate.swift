@@ -15,8 +15,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private var keybindingsWindow: KeybindingsWindowController!
     private var focusFollowsMouse: FocusFollowsMouse!
     private let mouseTracker = MouseTracker()
-    private let island = NotchIsland()
-    private let media = MediaController()
     private var permissionGranted = false
 
     func applicationDidFinishLaunching(_ notification: Notification) {
@@ -82,18 +80,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
         focusFollowsMouse = FocusFollowsMouse(controller: controller)
 
-        island.model.onPlayPause = { [weak self] in self?.media.playPause() }
-        island.model.onNext = { [weak self] in self?.media.nextTrack() }
-        island.model.onPrevious = { [weak self] in self?.media.previousTrack() }
-        island.model.onSelectWorkspace = { [weak self] number in
-            self?.controller.switchWorkspace(to: number)
-        }
-        media.onUpdate = { [weak self] nowPlaying in
-            guard let self else { return }
-            self.island.model.nowPlaying = nowPlaying
-            self.island.noteContentChanged()
-        }
-
         configManager.onConfigChanged = { [weak self] config in
             guard let self else { return }
             self.controller.apply(config: config)
@@ -101,8 +87,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             self.statusMenu.refresh()
             self.keybindingsModel.refresh()
             self.focusFollowsMouse.setEnabled(self.permissionGranted && config.input.followMouse)
-            self.island.setEnabled(config.island.enabled)
-            if config.island.enabled { self.media.start() } else { self.media.stop() }
         }
         configManager.onError = { [weak self] _ in
             self?.statusMenu.refresh()
@@ -117,12 +101,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             guard let self else { return }
             self.statusMenu.refresh()
             self.keybindingsModel.setTilingPaused(self.controller.paused)
-            self.island.model.workspace = self.controller.state.current
-            self.island.model.occupiedWorkspaces = Set(
-                self.controller.state.workspaces.compactMap {
-                    $0.value.allWindows.isEmpty ? nil : $0.key
-                })
-            self.island.noteContentChanged()
             self.refreshBorder()
         }
 

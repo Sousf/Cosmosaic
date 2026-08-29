@@ -30,10 +30,6 @@ final class ConfigManager {
         follow_mouse = 1    # Hyprland-style hover focus; 0 to disable
     }
 
-    island {
-        enabled = 1         # notch island: workspace + media controls
-    }
-
     animations {
         enabled = 1         # smooth window swaps and fullscreen transitions
         duration = 260      # milliseconds
@@ -166,14 +162,6 @@ final class ConfigManager {
             lastError = ConfigError(line: 0, message: "\(error)")
             onError?(lastError!)
         }
-    }
-
-    /// Persist the notch-island toggle.
-    func setIslandEnabled(_ enabled: Bool) {
-        guard let text = fileText() else { return }
-        write(text: ConfigEditor.setOption(in: text, block: "island",
-                                           key: "enabled",
-                                           value: enabled ? "1" : "0"))
     }
 
     /// Persist the follow-mouse toggle into the config file (surgical edit;
