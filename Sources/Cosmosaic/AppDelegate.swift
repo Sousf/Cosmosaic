@@ -39,8 +39,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             self?.controller.setPaused(!enabled)
         }
         windowManager.onWindowMoved = { [weak self] id in
-            guard let self, id == self.windowManager.focusedID else { return }
-            self.refreshBorder()
+            guard let self, id == self.windowManager.focusedID,
+                  // Our own animation ticks echo back as moved events; the
+                  // border is already fed interpolated frames directly, and
+                  // running the full refresher per echo starves the ticks.
+                  !self.controller.animator.isAnimating else { return }
+            self.scheduleBorderRefresh()
         }
         // The border glides with the focused window during animations.
         controller.animator.onFocusedFrame = { [weak self] frame in
@@ -138,6 +142,19 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     private var borderRecheck: DispatchWorkItem?
+    private var borderRefreshPending = false
+
+    /// Coalesce refresh bursts (event drains after animations, rapid AX
+    /// notifications) into one refresh per run-loop pass.
+    private func scheduleBorderRefresh() {
+        guard !borderRefreshPending else { return }
+        borderRefreshPending = true
+        DispatchQueue.main.async { [weak self] in
+            guard let self else { return }
+            self.borderRefreshPending = false
+            self.refreshBorder()
+        }
+    }
 
     private func refreshBorder() {
         borderRecheck?.cancel()
