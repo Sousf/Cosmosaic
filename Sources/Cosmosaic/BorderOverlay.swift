@@ -81,8 +81,12 @@ final class BorderOverlay {
         let ring = bounds.insetBy(dx: borderWidth / 2, dy: borderWidth / 2)
         maskLayer.frame = bounds
         maskLayer.lineWidth = borderWidth
-        maskLayer.path = CGPath(roundedRect: ring, cornerWidth: 9, cornerHeight: 9,
-                                transform: nil)
+        // Concentric with modern macOS window corners (~16pt): the stroke
+        // centerline sits half the border width outside the window edge, so
+        // its radius grows by the same amount to keep the curves parallel.
+        let radius = 16 + borderWidth / 2
+        maskLayer.path = CGPath(roundedRect: ring, cornerWidth: radius,
+                                cornerHeight: radius, transform: nil)
 
         if appearance != currentAppearance {
             currentAppearance = appearance
