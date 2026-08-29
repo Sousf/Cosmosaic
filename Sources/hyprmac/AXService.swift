@@ -162,6 +162,31 @@ enum AX {
         AXUIElementPerformAction(button, kAXPressAction as CFString)
     }
 
+    /// Whether a window with `frame` owned by `pid` is actually the frontmost
+    /// thing at its own midpoint, via the public window list (front-to-back;
+    /// bounds/pid/layer need no extra permission). Lets the border refuse to
+    /// draw around a buried window.
+    static func isFrameFrontmost(_ frame: CGRect, pid: pid_t) -> Bool {
+        guard let list = CGWindowListCopyWindowInfo(
+            [.optionOnScreenOnly, .excludeDesktopElements],
+            kCGNullWindowID) as? [[String: Any]] else { return true }
+        let mid = CGPoint(x: frame.midX, y: frame.midY)
+        for info in list {
+            guard (info[kCGWindowLayer as String] as? Int) == 0,
+                  let boundsDict = info[kCGWindowBounds as String] as? [String: CGFloat] else {
+                continue
+            }
+            let bounds = CGRect(x: boundsDict["X"] ?? 0, y: boundsDict["Y"] ?? 0,
+                                width: boundsDict["Width"] ?? 0,
+                                height: boundsDict["Height"] ?? 0)
+            guard bounds.contains(mid) else { continue }
+            let owner = (info[kCGWindowOwnerPID as String] as? pid_t) ?? -1
+            return owner == pid && abs(bounds.minX - frame.minX) < 3
+                && abs(bounds.minY - frame.minY) < 3
+        }
+        return false
+    }
+
     // MARK: - Plumbing
 
     private static func copyAttribute<T>(_ element: AXUIElement, _ attribute: String) -> T? {

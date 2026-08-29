@@ -14,8 +14,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private var keybindingsModel: KeybindingsModel!
     private var keybindingsWindow: KeybindingsWindowController!
     private var focusFollowsMouse: FocusFollowsMouse!
+    private let mouseTracker = MouseTracker()
     private var permissionGranted = false
-    private var dragTimer: Timer?
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         controller = TilingController(windowManager: windowManager)
@@ -39,11 +39,23 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         windowManager.onWindowMoved = { [weak self] id in
             guard let self, id == self.windowManager.focusedID else { return }
             self.refreshBorder()
-            // AX move events arrive too sparsely to track a live drag; poll
-            // at 60 Hz while the button stays down so the border keeps up.
-            if NSEvent.pressedMouseButtons != 0 {
-                self.startDragTracking()
-            }
+        }
+        // Drags and clicks reorder windows without any AX event; the mouse
+        // tracker drives live border tracking and z-order re-assertion.
+        mouseTracker.focusedElement = { [weak self] in
+            guard let self, let id = self.windowManager.focusedID else { return nil }
+            return self.windowManager.windows[id]?.element
+        }
+        mouseTracker.onDragTick = { [weak self] frame in
+            guard let self, !self.controller.paused else { return }
+            self.borderOverlay.update(around: frame,
+                                      color: self.controller.config.general.activeBorderColor,
+                                      width: self.controller.config.general.borderSize)
+        }
+        mouseTracker.onSettled = { [weak self] in
+            guard let self else { return }
+            self.controller.raiseFloatingWindows()
+            self.refreshBorder()
         }
 
         focusFollowsMouse = FocusFollowsMouse(controller: controller)
@@ -80,25 +92,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             guard let self else { return }
             self.permissionGranted = true
             self.windowManager.start()
+            self.mouseTracker.start()
             self.statusMenu.refresh()
             self.keybindingsModel.refresh()
             self.focusFollowsMouse.setEnabled(self.configManager.config.input.followMouse)
-        }
-    }
-
-    private func startDragTracking() {
-        guard dragTimer == nil else { return }
-        dragTimer = Timer.scheduledTimer(withTimeInterval: 1.0 / 60.0,
-                                         repeats: true) { [weak self] _ in
-            MainActor.assumeIsolated {
-                guard let self else { return }
-                self.refreshBorder()
-                if NSEvent.pressedMouseButtons == 0 {
-                    self.dragTimer?.invalidate()
-                    self.dragTimer = nil
-                    self.refreshBorder()
-                }
-            }
         }
     }
 
@@ -107,7 +104,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
               let focusedID = windowManager.focusedID,
               let managed = windowManager.windows[focusedID],
               controller.state.workspace(of: focusedID) == controller.state.current,
-              let frame = AX.frame(of: managed.element) else {
+              let frame = AX.frame(of: managed.element),
+              // Never draw around a buried window — a border hovering over
+              // whatever covers its window is worse than no border.
+              AX.isFrameFrontmost(frame, pid: managed.pid) else {
             borderOverlay.hide()
             return
         }
