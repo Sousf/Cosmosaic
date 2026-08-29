@@ -131,6 +131,7 @@ final class TilingController {
                 state.setLastFocused(id, inWorkspace: workspace)
             }
             raiseFloatingWindows()
+            enforceFullscreenDominance()
             onStateChanged?()
         }
     }
@@ -202,8 +203,8 @@ final class TilingController {
            let screenKey = state.screenOf[fullscreenID],
            let screen = Screens.screen(for: screenKey) {
             AX.setFrame(managed.element, to: AX.tileableArea(of: screen))
-            AX.raise(managed.element)
         }
+        enforceFullscreenDominance()
 
         raiseFloatingWindows()
         onStateChanged?()
@@ -366,6 +367,30 @@ final class TilingController {
             return id
         }
         return nil
+    }
+
+    // MARK: - Fullscreen dominance
+
+    private var fullscreenEnforce: DispatchWorkItem?
+
+    /// Nothing appears above the current workspace's fullscreen window:
+    /// re-raise it now and once more shortly after, since apps raise their
+    /// own new windows and activations reorder behind our back.
+    func enforceFullscreenDominance() {
+        guard !paused,
+              let fullscreenID = state.currentWorkspace.fullscreen,
+              let managed = windowManager.windows[fullscreenID] else { return }
+        AX.raise(managed.element)
+
+        fullscreenEnforce?.cancel()
+        let work = DispatchWorkItem { [weak self] in
+            guard let self,
+                  self.state.currentWorkspace.fullscreen == fullscreenID,
+                  let current = self.windowManager.windows[fullscreenID] else { return }
+            AX.raise(current.element)
+        }
+        fullscreenEnforce = work
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.25, execute: work)
     }
 
     /// A dialog (save prompt, alert) is frontmost — nothing may cover it.

@@ -57,6 +57,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         mouseTracker.onSettled = { [weak self] in
             guard let self else { return }
             self.controller.raiseFloatingWindows()
+            self.controller.enforceFullscreenDominance()
             self.refreshBorder()
         }
 
