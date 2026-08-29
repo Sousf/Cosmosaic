@@ -15,6 +15,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private var keybindingsWindow: KeybindingsWindowController!
     private var focusFollowsMouse: FocusFollowsMouse!
     private var permissionGranted = false
+    private var dragTimer: Timer?
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         controller = TilingController(windowManager: windowManager)
@@ -38,6 +39,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         windowManager.onWindowMoved = { [weak self] id in
             guard let self, id == self.windowManager.focusedID else { return }
             self.refreshBorder()
+            // AX move events arrive too sparsely to track a live drag; poll
+            // at 60 Hz while the button stays down so the border keeps up.
+            if NSEvent.pressedMouseButtons != 0 {
+                self.startDragTracking()
+            }
         }
 
         focusFollowsMouse = FocusFollowsMouse(controller: controller)
@@ -77,6 +83,22 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             self.statusMenu.refresh()
             self.keybindingsModel.refresh()
             self.focusFollowsMouse.setEnabled(self.configManager.config.input.followMouse)
+        }
+    }
+
+    private func startDragTracking() {
+        guard dragTimer == nil else { return }
+        dragTimer = Timer.scheduledTimer(withTimeInterval: 1.0 / 60.0,
+                                         repeats: true) { [weak self] _ in
+            MainActor.assumeIsolated {
+                guard let self else { return }
+                self.refreshBorder()
+                if NSEvent.pressedMouseButtons == 0 {
+                    self.dragTimer?.invalidate()
+                    self.dragTimer = nil
+                    self.refreshBorder()
+                }
+            }
         }
     }
 

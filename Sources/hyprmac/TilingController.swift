@@ -119,6 +119,7 @@ final class TilingController {
             if let workspace = state.workspace(of: id) {
                 state.setLastFocused(id, inWorkspace: workspace)
             }
+            raiseFloatingWindows()
             onStateChanged?()
         }
     }
@@ -163,6 +164,7 @@ final class TilingController {
             AX.raise(managed.element)
         }
 
+        raiseFloatingWindows()
         onStateChanged?()
     }
 
@@ -322,19 +324,41 @@ final class TilingController {
         return nil
     }
 
+    /// A dialog (save prompt, alert) is frontmost — nothing may cover it.
+    private func dialogIsFrontmost() -> Bool {
+        guard let front = NSWorkspace.shared.frontmostApplication,
+              let focusedElement = AX.focusedWindow(ofPID: front.processIdentifier) else {
+            return false
+        }
+        return AX.isDialog(focusedElement)
+    }
+
+    /// Hyprland's z-order rule: floating windows live above the tiled layer.
+    /// App activation constantly reorders windows, so re-assert after focus
+    /// and layout changes. The focused float is raised last (topmost).
+    func raiseFloatingWindows() {
+        guard !paused, !dialogIsFrontmost() else { return }
+        let floating = state.currentWorkspace.floating
+        guard !floating.isEmpty else { return }
+        let ordered = floating.sorted {
+            ($0 == windowManager.focusedID ? 1 : 0) < ($1 == windowManager.focusedID ? 1 : 0)
+        }
+        for id in ordered {
+            guard let managed = windowManager.windows[id] else { continue }
+            AX.raise(managed.element)
+        }
+    }
+
     /// Hover focus: focus the window under the mouse without raising it.
     func hoverFocus(at axPoint: CGPoint) {
         guard !paused, config.input.followMouse else { return }
         // A dialog is up front (save prompt, alert): hover must not bury it.
-        if let front = NSWorkspace.shared.frontmostApplication,
-           let focusedElement = AX.focusedWindow(ofPID: front.processIdentifier),
-           AX.isDialog(focusedElement) {
-            return
-        }
+        if dialogIsFrontmost() { return }
         guard let id = windowAt(axPoint: axPoint),
               id != windowManager.focusedID,
               let managed = windowManager.windows[id] else { return }
         AX.focusWithoutRaise(managed.element, pid: managed.pid)
+        raiseFloatingWindows()
     }
 
     private func moveWindow(_ direction: Direction) {
