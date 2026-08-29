@@ -137,6 +137,13 @@ enum AX {
     }
 
     @discardableResult
+    static func setSize(_ element: AXUIElement, to size: CGSize) -> Bool {
+        var size = size
+        guard let sizeValue = AXValueCreate(.cgSize, &size) else { return false }
+        return AXUIElementSetAttributeValue(element, kAXSizeAttribute as CFString, sizeValue) == .success
+    }
+
+    @discardableResult
     static func setPosition(_ element: AXUIElement, to point: CGPoint) -> Bool {
         var origin = point
         guard let posValue = AXValueCreate(.cgPoint, &origin) else { return false }

@@ -493,13 +493,16 @@ final class TilingController {
         state.swapInTree(focusedID, neighbor)
 
         // Float the two windows across each other; everything else is
-        // untouched by a sibling swap. The completing relayout trues up.
+        // untouched by a sibling swap. Starting from the LIVE frames (not
+        // tree frames) keeps chained swaps continuous — a mid-flight window
+        // reverses smoothly instead of snapping to a computed origin.
         let after = currentTiledFrames()
         guard animationDuration > 0,
-              let fromA = before[focusedID], let toA = after[focusedID],
-              let fromB = before[neighbor], let toB = after[neighbor],
+              let toA = after[focusedID], let toB = after[neighbor],
               let managedA = windowManager.windows[focusedID],
-              let managedB = windowManager.windows[neighbor] else {
+              let managedB = windowManager.windows[neighbor],
+              let fromA = AX.frame(of: managedA.element) ?? before[focusedID],
+              let fromB = AX.frame(of: managedB.element) ?? before[neighbor] else {
             relayout()
             return
         }

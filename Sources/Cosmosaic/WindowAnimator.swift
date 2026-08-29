@@ -1,27 +1,35 @@
 import AppKit
 import QuartzCore
 
-/// Animates window frames through AX at ~60fps with ease-in-out — the
-/// float-over feel for swaps and fullscreen transitions. Scoped to one or
-/// two windows at a time; whole-layout changes stay instant by design.
+/// Animates window frames through AX, paced by a display link (120Hz on
+/// ProMotion) with ease-in-out — the float-over feel for swaps and
+/// fullscreen transitions. Scoped to one or two windows at a time;
+/// whole-layout changes stay instant by design.
 @MainActor
-final class WindowAnimator {
+final class WindowAnimator: NSObject {
 
     struct Item {
         let element: AXUIElement
         let from: CGRect
         let to: CGRect
         let isFocused: Bool
+
+        /// Same-size moves need only one AX call per tick.
+        var resizes: Bool {
+            abs(from.width - to.width) > 0.5 || abs(from.height - to.height) > 0.5
+        }
     }
 
     /// Interpolated frame of the focused item each tick (border glide).
     var onFocusedFrame: ((CGRect) -> Void)?
 
-    private var timer: Timer?
+    private var displayLink: CADisplayLink?
     private var completion: (() -> Void)?
     private var items: [Item] = []
+    private var startTime: CFTimeInterval = 0
+    private var duration: Double = 0
 
-    var isAnimating: Bool { timer != nil }
+    var isAnimating: Bool { displayLink != nil }
 
     func animate(_ items: [Item], durationMs: Int, completion: @escaping () -> Void) {
         cancel()
@@ -32,37 +40,50 @@ final class WindowAnimator {
         }
         self.items = items
         self.completion = completion
-        let start = CACurrentMediaTime()
-        let duration = Double(durationMs) / 1000.0
+        startTime = CACurrentMediaTime()
+        duration = Double(durationMs) / 1000.0
 
-        timer = Timer.scheduledTimer(withTimeInterval: 1.0 / 60.0,
-                                     repeats: true) { [weak self] _ in
-            MainActor.assumeIsolated {
-                guard let self else { return }
-                let progress = min(1, (CACurrentMediaTime() - start) / duration)
-                let eased = Self.easeInOutCubic(progress)
-                for item in self.items {
-                    let frame = Self.lerp(item.from, item.to, eased)
-                    AX.setFrame(item.element, to: frame)
-                    if item.isFocused { self.onFocusedFrame?(frame) }
+        let link = (NSScreen.main ?? NSScreen.screens.first)?
+            .displayLink(target: self, selector: #selector(tick))
+        link?.add(to: .main, forMode: .common)
+        displayLink = link
+        if link == nil {
+            // No display link available: land instantly rather than hang.
+            for item in items { AX.setFrame(item.element, to: item.to) }
+            finish()
+        }
+    }
+
+    @objc private func tick() {
+        MainActor.assumeIsolated {
+            let progress = min(1, (CACurrentMediaTime() - startTime) / duration)
+            let eased = Self.easeInOutCubic(progress)
+            for item in items {
+                let frame = Self.lerp(item.from, item.to, eased)
+                // Slim writes during flight; the finish sets exact frames.
+                if item.resizes {
+                    AX.setSize(item.element, to: frame.size)
                 }
-                if progress >= 1 { self.finish() }
+                AX.setPosition(item.element, to: frame.origin)
+                if item.isFocused { onFocusedFrame?(frame) }
             }
+            if progress >= 1 { finish() }
         }
     }
 
     /// Stop without calling the completion — the caller is superseding the
     /// animation (usually with an instant relayout).
     func cancel() {
-        timer?.invalidate()
-        timer = nil
+        displayLink?.invalidate()
+        displayLink = nil
         completion = nil
         items = []
     }
 
     private func finish() {
-        timer?.invalidate()
-        timer = nil
+        displayLink?.invalidate()
+        displayLink = nil
+        for item in items { AX.setFrame(item.element, to: item.to) }
         items = []
         let done = completion
         completion = nil
