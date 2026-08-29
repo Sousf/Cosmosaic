@@ -60,6 +60,8 @@ public struct GeneralConfig: Sendable, Equatable {
     public var gapsIn: Int = 5
     public var gapsOut: Int = 10
     public var borderSize: Int = 2
+    /// Windows smaller than this in BOTH dimensions float; zero disables.
+    public var floatBelowSize = CGSize(width: 350, height: 250)
     public var activeBorderColor = ConfigColor(r: 0x33, g: 0xcc, b: 0xff, a: 0xee)
     public var inactiveBorderColor = ConfigColor(r: 0x59, g: 0x59, b: 0x59, a: 0xff)
 

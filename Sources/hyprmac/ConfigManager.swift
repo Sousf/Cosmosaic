@@ -18,6 +18,8 @@ final class ConfigManager {
         border_size = 2
         col.active_border = rgba(33ccffee)
         col.inactive_border = rgba(59595900)
+        float_below_size = 350 250    # windows smaller than this in BOTH
+                                      # dimensions float; 0 0 disables
     }
 
     input {
@@ -80,10 +82,12 @@ final class ConfigManager {
     # Reload this file (also happens automatically on save)
     bind = $mod SHIFT, C, reload
 
-    # Apps that should never be tiled
+    # Window rules: float or tile, matched (regex) against app name OR window
+    # title. A tile rule overrides every automatic heuristic.
     windowrule = float, ^(System Settings)$
     windowrule = float, ^(Calculator)$
     windowrule = float, ^(Activity Monitor)$
+    windowrule = float, Picture-in-Picture
     """
 
     let configDirectory = FileManager.default.homeDirectoryForCurrentUser

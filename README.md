@@ -10,9 +10,16 @@ direct download.
 hyprmac is a menu-bar agent. It watches every normal window through the
 Accessibility API and tiles them into a dwindle BSP layout — each new window
 splits the focused one, alternating orientation by region aspect, exactly like
-Hyprland's default layout. Only resizable windows tile: fixed-size windows
-(settings panels, about boxes) and dialog popups automatically float above
-the tiled layer. Global hotkeys are registered through Carbon
+Hyprland's default layout.
+
+Float-or-tile is decided in layers, most trustworthy first: your
+`windowrule`s (regex on app name or title; a `tile` rule overrides every
+heuristic), then structure (modals and dialogs raise above the tiles
+unmanaged; immovable windows are left alone; non-resizable windows float),
+then size (windows born smaller than `float_below_size` in both dimensions
+float). Finally the layout is verified after it's applied: a window that
+refuses its assigned tile size — resizable-but-clamped settings panels —
+is automatically demoted to floating at the size it insists on. Global hotkeys are registered through Carbon
 `RegisterEventHotKey`, so bound keys are consumed before apps see them and no
 Input Monitoring permission is needed.
 

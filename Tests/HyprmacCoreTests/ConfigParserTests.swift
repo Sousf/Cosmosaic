@@ -130,6 +130,20 @@ final class ConfigParserTests: XCTestCase {
         XCTAssertThrowsError(try ConfigParser.parse("general {\n    gaps_in = 4\n"))
     }
 
+    func testParsesFloatBelowSize() throws {
+        let config = try ConfigParser.parse("general {\n    float_below_size = 400 300\n}")
+        XCTAssertEqual(config.general.floatBelowSize, CGSize(width: 400, height: 300))
+    }
+
+    func testFloatBelowSizeDefault() throws {
+        let config = try ConfigParser.parse("bind = ALT, Q, killactive")
+        XCTAssertEqual(config.general.floatBelowSize, CGSize(width: 350, height: 250))
+    }
+
+    func testInvalidFloatBelowSizeThrows() {
+        XCTAssertThrowsError(try ConfigParser.parse("general {\n    float_below_size = big\n}"))
+    }
+
     func testParsesInputBlockFollowMouse() throws {
         let off = try ConfigParser.parse("input {\n    follow_mouse = 0\n}")
         XCTAssertFalse(off.input.followMouse)

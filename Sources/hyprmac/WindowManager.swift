@@ -81,10 +81,24 @@ final class WindowManager {
     private func scanWindows(of app: NSRunningApplication) {
         guard !app.isTerminated else { return }
         for element in AX.windows(ofPID: app.processIdentifier)
-        where AX.isStandardWindow(element) && findID(of: element) == nil {
-            register(element: element, pid: app.processIdentifier,
-                     appName: app.localizedName ?? "?")
+        where findID(of: element) == nil {
+            adoptElement(element, pid: app.processIdentifier,
+                         appName: app.localizedName ?? "?", raiseDialogs: false)
         }
+    }
+
+    /// Single gate for whether/how a window enters management: immovable
+    /// windows are untouchable, dialogs/modals are raised but never managed,
+    /// standard windows register.
+    private func adoptElement(_ element: AXUIElement, pid: pid_t, appName: String,
+                              raiseDialogs: Bool) {
+        guard AX.isMovable(element) else { return }
+        if AX.isDialog(element) {
+            if raiseDialogs { AX.raise(element) }
+            return
+        }
+        guard AX.isStandardWindow(element) else { return }
+        register(element: element, pid: pid, appName: appName)
     }
 
     private func register(element: AXUIElement, pid: pid_t, appName: String) {
@@ -102,13 +116,14 @@ final class WindowManager {
         }
     }
 
-    /// Register an element we haven't seen if it's a tileable window.
+    /// Adopt an element we haven't seen: dialogs raised, standard windows
+    /// registered, everything else left alone.
     private func registerIfStandard(_ element: AXUIElement) {
-        guard AX.isStandardWindow(element), findID(of: element) == nil else { return }
+        guard findID(of: element) == nil else { return }
         var pid: pid_t = 0
         AXUIElementGetPid(element, &pid)
         let appName = NSRunningApplication(processIdentifier: pid)?.localizedName ?? "?"
-        register(element: element, pid: pid, appName: appName)
+        adoptElement(element, pid: pid, appName: appName, raiseDialogs: true)
     }
 
     private func unregister(_ id: WindowID) {
@@ -182,12 +197,6 @@ final class WindowManager {
     private func handleAXEvent(name: String, element: AXUIElement) {
         switch name {
         case kAXWindowCreatedNotification, kAXWindowDeminiaturizedNotification:
-            if AX.isDialog(element) {
-                // Popups never tile, but they must start above the tiled
-                // layer instead of buried behind it.
-                AX.raise(element)
-                return
-            }
             registerIfStandard(element)
 
         case kAXUIElementDestroyedNotification, kAXWindowMiniaturizedNotification:

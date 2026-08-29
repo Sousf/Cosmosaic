@@ -90,15 +90,25 @@ enum AX {
 
     /// A popup the app owns (save prompt, alert, floating panel): never tiled,
     /// but kept above the tiled layer. Sheets are excluded — macOS attaches
-    /// them to their parent window itself.
+    /// them to their parent window itself. Modal windows count as dialogs
+    /// even when their subrole claims otherwise.
     static func isDialog(_ element: AXUIElement) -> Bool {
         guard role(element) == kAXWindowRole else { return false }
         switch subrole(element) {
         case kAXDialogSubrole, kAXSystemDialogSubrole, kAXFloatingWindowSubrole:
             return true
         default:
-            return false
+            return (copyAttribute(element, kAXModalAttribute) as CFBoolean?) == kCFBooleanTrue
         }
+    }
+
+    /// Whether the app lets this window be moved at all. Immovable windows
+    /// (some overlays) cannot be managed in any way.
+    static func isMovable(_ element: AXUIElement) -> Bool {
+        var settable = DarwinBoolean(false)
+        let result = AXUIElementIsAttributeSettable(element, kAXPositionAttribute as CFString,
+                                                    &settable)
+        return result == .success && settable.boolValue
     }
 
     static func frame(of element: AXUIElement) -> CGRect? {

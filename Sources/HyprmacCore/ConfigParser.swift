@@ -182,6 +182,13 @@ extension ConfigParser {
         case "border_size": general.borderSize = try integer()
         case "col.active_border": general.activeBorderColor = try parseColor(value, line: line)
         case "col.inactive_border": general.inactiveBorderColor = try parseColor(value, line: line)
+        case "float_below_size":
+            let parts = value.split(separator: " ").compactMap { Int($0) }
+            guard parts.count == 2, parts[0] >= 0, parts[1] >= 0 else {
+                throw ConfigError(line: line,
+                                  message: "float_below_size expects 'WIDTH HEIGHT', got '\(value)'")
+            }
+            general.floatBelowSize = CGSize(width: parts[0], height: parts[1])
         default:
             throw ConfigError(line: line, message: "unknown general option '\(key)'")
         }

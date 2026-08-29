@@ -58,18 +58,20 @@ final class TilingController {
     }
 
     private func track(_ managed: WindowManager.Managed) {
-        // Only windows that can actually be resized are tiled; fixed-size
-        // windows (settings panels, about boxes) float at their natural size.
-        let floating = shouldFloat(appName: managed.appName)
-            || !AX.isResizable(managed.element)
         let frame = AX.frame(of: managed.element) ?? .zero
+        let verdict = TilePolicy.verdict(rules: config.windowRules,
+                                         appName: managed.appName,
+                                         title: AX.title(managed.element),
+                                         isResizable: AX.isResizable(managed.element),
+                                         size: frame.size,
+                                         floatBelowSize: config.general.floatBelowSize)
         let screen = Screens.screenContaining(axPoint: CGPoint(x: frame.midX, y: frame.midY))
             ?? NSScreen.main
         guard let screen else { return }
 
         state.add(managed.id, toWorkspace: state.current,
                   screen: Screens.key(for: screen),
-                  floating: floating, after: windowManager.focusedID)
+                  floating: verdict == .float, after: windowManager.focusedID)
     }
 
     private func windowRemoved(_ id: WindowID) {
@@ -124,13 +126,41 @@ final class TilingController {
         }
     }
 
-    private func shouldFloat(appName: String) -> Bool {
-        for rule in config.windowRules where rule.effect == .float {
-            if appName.range(of: rule.appPattern, options: .regularExpression) != nil {
-                return true
+    // MARK: - Verify after apply
+
+    private var verifyWork: DispatchWorkItem?
+
+    /// Static signals can lie (resizable-but-clamped windows pass every
+    /// check). The window's response to being tiled is the truth: one that
+    /// came out drastically smaller than its assigned frame gets demoted to
+    /// floating. Generous tolerances spare terminals' cell-grid snapping.
+    private func scheduleTileVerification(assigned: [WindowID: CGRect]) {
+        verifyWork?.cancel()
+        let work = DispatchWorkItem { [weak self] in
+            self?.verifyTiles(assigned: assigned)
+        }
+        verifyWork = work
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.4, execute: work)
+    }
+
+    private func verifyTiles(assigned: [WindowID: CGRect]) {
+        guard !paused else { return }
+        var demoted = false
+        for (id, target) in assigned {
+            guard state.workspace(of: id) == state.current,
+                  !state.isFloating(id),
+                  state.currentWorkspace.fullscreen != id,
+                  let managed = windowManager.windows[id],
+                  let actual = AX.frame(of: managed.element) else { continue }
+            let widthShortfall = target.width - actual.width
+            let heightShortfall = target.height - actual.height
+            if (widthShortfall > 100 && actual.width < target.width * 0.85)
+                || (heightShortfall > 100 && actual.height < target.height * 0.85) {
+                state.setFloating(id, true, after: nil)
+                demoted = true
             }
         }
-        return false
+        if demoted { relayout() }
     }
 
     // MARK: - Layout
@@ -150,10 +180,12 @@ final class TilingController {
         guard !paused else { return }
 
         let workspace = state.currentWorkspace
-        for (id, frame) in currentTiledFrames() {
+        let frames = currentTiledFrames()
+        for (id, frame) in frames {
             guard let managed = windowManager.windows[id] else { continue }
             AX.setFrame(managed.element, to: frame)
         }
+        scheduleTileVerification(assigned: frames)
 
         // Fullscreen window covers its whole screen, above the tiled layer.
         if let fullscreenID = workspace.fullscreen,
