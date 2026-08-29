@@ -121,23 +121,50 @@ final class WindowAnimator: NSObject {
     }
 
     /// Stop without calling the completion — the caller is superseding the
-    /// animation (usually with an instant relayout).
+    /// animation (usually with an instant relayout). Drains in-flight writes
+    /// first so a stale interpolated frame can't land after the caller's.
     func cancel() {
         displayLink?.invalidate()
         displayLink = nil
         completion = nil
+        for state in states { state.queue.sync { } }
         states = []
     }
 
     private func finish() {
         displayLink?.invalidate()
         displayLink = nil
-        // Exact final frames through the robust main-actor path.
-        for state in states { AX.setFrame(state.item.element, to: state.item.to) }
+        // Final exact frames go through each window's own queue — serialized
+        // behind any in-flight write — with the clamp-proof full sequence.
+        // The completion fires only after every queue drains, so nothing
+        // stale can overwrite the landing.
+        let group = DispatchGroup()
+        for state in states {
+            let handle = ElementHandle(element: state.item.element)
+            let target = state.item.to
+            group.enter()
+            state.queue.async {
+                Self.applyFinalFrame(handle, frame: target)
+                group.leave()
+            }
+        }
         states = []
         let done = completion
         completion = nil
-        done?()
+        group.notify(queue: .main) { done?() }
+    }
+
+    /// Robust landing: size → position → size, matching AX.setFrame's dance
+    /// for apps that clamp position against their current size.
+    private nonisolated static func applyFinalFrame(_ handle: ElementHandle,
+                                                    frame: CGRect) {
+        var origin = frame.origin
+        var size = frame.size
+        guard let sizeValue = AXValueCreate(.cgSize, &size),
+              let positionValue = AXValueCreate(.cgPoint, &origin) else { return }
+        AXUIElementSetAttributeValue(handle.element, kAXSizeAttribute as CFString, sizeValue)
+        AXUIElementSetAttributeValue(handle.element, kAXPositionAttribute as CFString, positionValue)
+        AXUIElementSetAttributeValue(handle.element, kAXSizeAttribute as CFString, sizeValue)
     }
 
     private static func easeInOutCubic(_ t: Double) -> Double {
