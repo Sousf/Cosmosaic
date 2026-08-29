@@ -11,6 +11,11 @@ final class IslandModel: ObservableObject {
     /// zero means no notch — render as a compact pill instead.
     @Published var notchGap: CGFloat = 0
 
+    /// Collapsed wing widths: the right wing grows to carry the track title
+    /// when media is loaded, Dynamic-Island-style.
+    var leftWingWidth: CGFloat { 44 }
+    var rightWingWidth: CGFloat { nowPlaying == nil ? 44 : 172 }
+
     var onHoverChanged: ((Bool) -> Void)?
     var onPlayPause: (() -> Void)?
     var onNext: (() -> Void)?
@@ -41,20 +46,28 @@ final class NotchIsland {
 
     private var collapsedFrame: NSRect {
         guard let screen else { return .zero }
-        let height: CGFloat
-        let width: CGFloat
         if let notchWidth {
-            // Slim wings hugging the housing, exactly notch-height tall.
-            height = screen.safeAreaInsets.top
-            width = notchWidth + 88
-        } else {
-            // No notch: a compact pill overlapping the menu bar's center.
-            height = 24
-            width = 96
+            // Wings hug the housing at exact notch height. The hollow must
+            // stay centered on the physical notch, so the panel's origin
+            // shifts when the wings are asymmetric.
+            let height = screen.safeAreaInsets.top
+            let width = model.leftWingWidth + notchWidth + model.rightWingWidth
+            return NSRect(x: screen.frame.midX - model.leftWingWidth - notchWidth / 2,
+                          y: screen.frame.maxY - height,
+                          width: width, height: height)
         }
+        // No notch: a compact pill overlapping the menu bar's center.
+        let width: CGFloat = model.nowPlaying == nil ? 96 : 224
         return NSRect(x: screen.frame.midX - width / 2,
-                      y: screen.frame.maxY - height,
-                      width: width, height: height)
+                      y: screen.frame.maxY - 24,
+                      width: width, height: 24)
+    }
+
+    /// Re-fit the collapsed strip when its content changes (track appears
+    /// or goes away) — no-op while expanded.
+    func noteContentChanged() {
+        guard panel != nil, !model.expanded else { return }
+        animate(to: collapsedFrame)
     }
 
     private var expandedFrame: NSRect {
@@ -152,15 +165,27 @@ private struct IslandView: View {
                 .font(.system(size: 13, weight: .bold, design: .rounded))
                 .monospacedDigit()
                 .foregroundStyle(.white)
-                .frame(maxWidth: .infinity)
+                .frame(width: model.notchGap > 0 ? model.leftWingWidth : nil)
             if model.notchGap > 0 {
                 // Hollow center: the physical notch lives here.
                 Spacer().frame(width: model.notchGap)
+            } else {
+                Spacer().frame(width: 10)
             }
-            Image(systemName: glyph)
-                .font(.system(size: 11, weight: .semibold))
-                .foregroundStyle(model.nowPlaying?.isPlaying == true ? .green : .gray)
-                .frame(maxWidth: .infinity)
+            HStack(spacing: 5) {
+                Image(systemName: glyph)
+                    .font(.system(size: 11, weight: .semibold))
+                    .foregroundStyle(model.nowPlaying?.isPlaying == true ? .green : .gray)
+                if let nowPlaying = model.nowPlaying {
+                    Text(nowPlaying.title)
+                        .font(.system(size: 11, weight: .medium))
+                        .foregroundStyle(.white.opacity(0.9))
+                        .lineLimit(1)
+                        .truncationMode(.tail)
+                }
+            }
+            .padding(.horizontal, 8)
+            .frame(width: model.notchGap > 0 ? model.rightWingWidth : nil)
         }
     }
 

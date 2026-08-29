@@ -72,7 +72,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         island.model.onNext = { [weak self] in self?.media.nextTrack() }
         island.model.onPrevious = { [weak self] in self?.media.previousTrack() }
         media.onUpdate = { [weak self] nowPlaying in
-            self?.island.model.nowPlaying = nowPlaying
+            guard let self else { return }
+            self.island.model.nowPlaying = nowPlaying
+            self.island.noteContentChanged()
         }
 
         configManager.onConfigChanged = { [weak self] config in
