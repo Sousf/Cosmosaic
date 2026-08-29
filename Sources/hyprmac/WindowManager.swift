@@ -19,7 +19,9 @@ final class WindowManager {
     private var nextID: WindowID = 1
     private var observers: [pid_t: AXObserver] = [:]
 
-    var onWindowAdded: ((Managed) -> Void)?
+    /// `isNew` is true for windows that just came into existence (created or
+    /// deminiaturized), false for pre-existing windows found by a scan.
+    var onWindowAdded: ((Managed, _ isNew: Bool) -> Void)?
     var onWindowRemoved: ((WindowID) -> Void)?
     var onFocusChanged: ((WindowID?) -> Void)?
     /// The window moved or resized outside hyprmac's control (user drag).
@@ -80,10 +82,15 @@ final class WindowManager {
 
     private func scanWindows(of app: NSRunningApplication) {
         guard !app.isTerminated else { return }
+        // Observer attach fails while a launching app's AX server warms up;
+        // retrying here (scans already retry) is what makes focus events
+        // from new apps reliable.
+        attachObserver(pid: app.processIdentifier)
         for element in AX.windows(ofPID: app.processIdentifier)
         where findID(of: element) == nil {
             adoptElement(element, pid: app.processIdentifier,
-                         appName: app.localizedName ?? "?", raiseDialogs: false)
+                         appName: app.localizedName ?? "?",
+                         raiseDialogs: false, isNew: false)
         }
     }
 
@@ -91,22 +98,22 @@ final class WindowManager {
     /// windows are untouchable, dialogs/modals are raised but never managed,
     /// standard windows register.
     private func adoptElement(_ element: AXUIElement, pid: pid_t, appName: String,
-                              raiseDialogs: Bool) {
+                              raiseDialogs: Bool, isNew: Bool) {
         guard AX.isMovable(element) else { return }
         if AX.isDialog(element) {
             if raiseDialogs { AX.raise(element) }
             return
         }
         guard AX.isStandardWindow(element) else { return }
-        register(element: element, pid: pid, appName: appName)
+        register(element: element, pid: pid, appName: appName, isNew: isNew)
     }
 
-    private func register(element: AXUIElement, pid: pid_t, appName: String) {
+    private func register(element: AXUIElement, pid: pid_t, appName: String, isNew: Bool) {
         let managed = Managed(id: nextID, element: element, pid: pid, appName: appName)
         nextID += 1
         windows[managed.id] = managed
         watchWindowElement(element, pid: pid)
-        onWindowAdded?(managed)
+        onWindowAdded?(managed, isNew)
         // Creation and focus-change events race in either order for brand-new
         // windows; if this window is already the app's focused one, adopt the
         // focus that would otherwise have been dropped.
@@ -123,7 +130,7 @@ final class WindowManager {
         var pid: pid_t = 0
         AXUIElementGetPid(element, &pid)
         let appName = NSRunningApplication(processIdentifier: pid)?.localizedName ?? "?"
-        adoptElement(element, pid: pid, appName: appName, raiseDialogs: true)
+        adoptElement(element, pid: pid, appName: appName, raiseDialogs: true, isNew: true)
     }
 
     private func unregister(_ id: WindowID) {

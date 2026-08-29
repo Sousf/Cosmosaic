@@ -21,7 +21,9 @@ final class TilingController {
 
     init(windowManager: WindowManager) {
         self.windowManager = windowManager
-        windowManager.onWindowAdded = { [weak self] managed in self?.windowAdded(managed) }
+        windowManager.onWindowAdded = { [weak self] managed, isNew in
+            self?.windowAdded(managed, isNew: isNew)
+        }
         windowManager.onWindowRemoved = { [weak self] id in self?.windowRemoved(id) }
         windowManager.onFocusChanged = { [weak self] id in self?.focusChanged(id) }
     }
@@ -51,10 +53,17 @@ final class TilingController {
 
     // MARK: - Window events
 
-    private func windowAdded(_ managed: WindowManager.Managed) {
+    private func windowAdded(_ managed: WindowManager.Managed, isNew: Bool) {
         guard !paused else { return }
         track(managed)
         relayout()
+        // Hyprland rule: a brand-new window takes focus. Enforce it instead
+        // of hoping macOS reports it (activation events race window creation).
+        // Except in fullscreen, where nothing may take over the screen.
+        if isNew, state.workspace(of: managed.id) == state.current,
+           state.currentWorkspace.fullscreen == nil {
+            AX.focus(managed.element, pid: managed.pid)
+        }
     }
 
     private func track(_ managed: WindowManager.Managed) {
