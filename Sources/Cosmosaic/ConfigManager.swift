@@ -227,22 +227,50 @@ final class ConfigManager {
         load()
     }
 
-    /// Watch the directory, not the file: editors save atomically by replacing
-    /// the file, which would orphan a file-level watch.
+    /// Watch the directory (editors save atomically by replacing the file —
+    /// a directory event) AND the file itself (scripts write in place — no
+    /// directory event). The file watch is rebuilt after replacements.
     private func watchDirectory() {
         let fd = open(configDirectory.path, O_EVTONLY)
         guard fd >= 0 else { return }
         let source = DispatchSource.makeFileSystemObjectSource(
             fileDescriptor: fd, eventMask: [.write], queue: .main)
         source.setEventHandler { [weak self] in
-            guard let self else { return }
-            self.reloadDebounce?.cancel()
-            let work = DispatchWorkItem { self.load() }
-            self.reloadDebounce = work
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.2, execute: work)
+            self?.scheduleReload()
         }
         source.setCancelHandler { close(fd) }
         source.resume()
         watcher = source
+        watchFile()
+    }
+
+    private var fileWatcher: DispatchSourceFileSystemObject?
+
+    private func watchFile() {
+        fileWatcher?.cancel()
+        fileWatcher = nil
+        let fd = open(configURL.path, O_EVTONLY)
+        guard fd >= 0 else { return }
+        let source = DispatchSource.makeFileSystemObjectSource(
+            fileDescriptor: fd, eventMask: [.write, .extend, .delete, .rename],
+            queue: .main)
+        source.setEventHandler { [weak self] in
+            self?.scheduleReload()
+        }
+        source.setCancelHandler { close(fd) }
+        source.resume()
+        fileWatcher = source
+    }
+
+    private func scheduleReload() {
+        reloadDebounce?.cancel()
+        let work = DispatchWorkItem { [weak self] in
+            guard let self else { return }
+            self.load()
+            // Atomic saves replaced the file; re-attach to the new inode.
+            self.watchFile()
+        }
+        reloadDebounce = work
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.2, execute: work)
     }
 }

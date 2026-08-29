@@ -19,12 +19,13 @@ final class IslandModel: ObservableObject {
         occupiedWorkspaces.union([workspace]).sorted()
     }
 
-    /// Collapsed wing widths: both wings grow with their content —
-    /// workspace strip on the left, track title on the right.
-    var leftWingWidth: CGFloat {
-        max(44, CGFloat(visibleWorkspaces.count) * 17 + 14)
+    /// Single symmetric wing width: sized to the larger side's content so
+    /// the island always balances evenly around the notch.
+    var wingWidth: CGFloat {
+        let workspacesNeed = CGFloat(visibleWorkspaces.count) * 17 + 16
+        let mediaNeed: CGFloat = nowPlaying == nil ? 44 : 168
+        return max(48, workspacesNeed, mediaNeed)
     }
-    var rightWingWidth: CGFloat { nowPlaying == nil ? 44 : 172 }
 
     var onHoverChanged: ((Bool) -> Void)?
     var onPlayPause: (() -> Void)?
@@ -58,12 +59,11 @@ final class NotchIsland {
     private var collapsedFrame: NSRect {
         guard let screen else { return .zero }
         if let notchWidth {
-            // Wings hug the housing at exact notch height. The hollow must
-            // stay centered on the physical notch, so the panel's origin
-            // shifts when the wings are asymmetric.
+            // Equal wings at exact notch height: always centered, always
+            // symmetric around the housing.
             let height = screen.safeAreaInsets.top
-            let width = model.leftWingWidth + notchWidth + model.rightWingWidth
-            return NSRect(x: screen.frame.midX - model.leftWingWidth - notchWidth / 2,
+            let width = model.wingWidth * 2 + notchWidth
+            return NSRect(x: screen.frame.midX - width / 2,
                           y: screen.frame.maxY - height,
                           width: width, height: height)
         }
@@ -154,7 +154,11 @@ private struct IslandView: View {
     @ObservedObject var model: IslandModel
 
     var body: some View {
-        Group {
+        let shape = UnevenRoundedRectangle(
+            cornerRadii: .init(bottomLeading: model.expanded ? 22 : 14,
+                               bottomTrailing: model.expanded ? 22 : 14),
+            style: .continuous)
+        return Group {
             if model.expanded {
                 expanded
             } else {
@@ -162,29 +166,43 @@ private struct IslandView: View {
             }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .background(Color.black)
-        .clipShape(UnevenRoundedRectangle(
-            cornerRadii: .init(bottomLeading: model.expanded ? 20 : 12,
-                               bottomTrailing: model.expanded ? 20 : 12)))
+        // Near-black with a whisper of depth: pure black at the top to melt
+        // into the notch, lifting slightly toward the bottom edge.
+        .background(
+            LinearGradient(colors: [.black, Color(white: 0.10)],
+                           startPoint: .top, endPoint: .bottom))
+        .clipShape(shape)
+        // Hairline edge so the island reads as a shaped object, not a hole.
+        .overlay(
+            shape.strokeBorder(
+                LinearGradient(colors: [Color.white.opacity(0.02),
+                                        Color.white.opacity(0.16)],
+                               startPoint: .top, endPoint: .bottom),
+                lineWidth: 1))
         .onHover { model.onHoverChanged?($0) }
         .animation(.easeOut(duration: 0.18), value: model.expanded)
     }
 
     private var collapsed: some View {
         HStack(spacing: 0) {
-            HStack(spacing: 5) {
+            HStack(spacing: 4) {
                 ForEach(model.visibleWorkspaces, id: \.self) { number in
-                    Text("\(number)")
-                        .font(.system(size: 12,
-                                      weight: number == model.workspace ? .bold : .medium,
-                                      design: .rounded))
-                        .monospacedDigit()
-                        .foregroundStyle(number == model.workspace
-                                         ? AnyShapeStyle(.white)
-                                         : AnyShapeStyle(.gray))
+                    if number == model.workspace {
+                        Text("\(number)")
+                            .font(.system(size: 11, weight: .bold, design: .rounded))
+                            .monospacedDigit()
+                            .foregroundStyle(.black)
+                            .frame(width: 16, height: 16)
+                            .background(Circle().fill(.white.opacity(0.92)))
+                    } else {
+                        Text("\(number)")
+                            .font(.system(size: 11, weight: .medium, design: .rounded))
+                            .monospacedDigit()
+                            .foregroundStyle(.white.opacity(0.45))
+                    }
                 }
             }
-            .frame(width: model.notchGap > 0 ? model.leftWingWidth : nil)
+            .frame(width: model.notchGap > 0 ? model.wingWidth : nil)
             if model.notchGap > 0 {
                 // Hollow center: the physical notch lives here.
                 Spacer().frame(width: model.notchGap)
@@ -194,17 +212,19 @@ private struct IslandView: View {
             HStack(spacing: 5) {
                 Image(systemName: glyph)
                     .font(.system(size: 11, weight: .semibold))
-                    .foregroundStyle(model.nowPlaying?.isPlaying == true ? .green : .gray)
+                    .foregroundStyle(model.nowPlaying?.isPlaying == true
+                                     ? AnyShapeStyle(Color.green)
+                                     : AnyShapeStyle(.white.opacity(0.45)))
                 if let nowPlaying = model.nowPlaying {
                     Text(nowPlaying.title)
                         .font(.system(size: 11, weight: .medium))
-                        .foregroundStyle(.white.opacity(0.9))
+                        .foregroundStyle(.white.opacity(0.85))
                         .lineLimit(1)
                         .truncationMode(.tail)
                 }
             }
-            .padding(.horizontal, 8)
-            .frame(width: model.notchGap > 0 ? model.rightWingWidth : nil)
+            .padding(.horizontal, 10)
+            .frame(width: model.notchGap > 0 ? model.wingWidth : nil)
         }
     }
 
