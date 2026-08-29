@@ -178,6 +178,12 @@ final class WindowManager {
     private func handleAXEvent(name: String, element: AXUIElement) {
         switch name {
         case kAXWindowCreatedNotification, kAXWindowDeminiaturizedNotification:
+            if AX.isDialog(element) {
+                // Popups never tile, but they must start above the tiled
+                // layer instead of buried behind it.
+                AX.raise(element)
+                return
+            }
             registerIfStandard(element)
 
         case kAXUIElementDestroyedNotification, kAXWindowMiniaturizedNotification:

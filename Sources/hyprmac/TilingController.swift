@@ -322,6 +322,12 @@ final class TilingController {
     /// Hover focus: focus the window under the mouse without raising it.
     func hoverFocus(at axPoint: CGPoint) {
         guard !paused, config.input.followMouse else { return }
+        // A dialog is up front (save prompt, alert): hover must not bury it.
+        if let front = NSWorkspace.shared.frontmostApplication,
+           let focusedElement = AX.focusedWindow(ofPID: front.processIdentifier),
+           AX.isDialog(focusedElement) {
+            return
+        }
         guard let id = windowAt(axPoint: axPoint),
               id != windowManager.focusedID,
               let managed = windowManager.windows[id] else { return }

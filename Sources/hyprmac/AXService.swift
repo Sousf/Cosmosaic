@@ -78,6 +78,19 @@ enum AX {
             && !isMinimized(element)
     }
 
+    /// A popup the app owns (save prompt, alert, floating panel): never tiled,
+    /// but kept above the tiled layer. Sheets are excluded — macOS attaches
+    /// them to their parent window itself.
+    static func isDialog(_ element: AXUIElement) -> Bool {
+        guard role(element) == kAXWindowRole else { return false }
+        switch subrole(element) {
+        case kAXDialogSubrole, kAXSystemDialogSubrole, kAXFloatingWindowSubrole:
+            return true
+        default:
+            return false
+        }
+    }
+
     static func frame(of element: AXUIElement) -> CGRect? {
         guard let posValue: AXValue = copyAttribute(element, kAXPositionAttribute),
               let sizeValue: AXValue = copyAttribute(element, kAXSizeAttribute) else {
