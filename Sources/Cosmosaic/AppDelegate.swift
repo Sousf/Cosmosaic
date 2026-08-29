@@ -49,7 +49,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         mouseTracker.onDragTick = { [weak self] frame in
             guard let self, !self.controller.paused,
                   let id = self.windowManager.focusedID,
-                  !self.controller.state.isFloating(id) else { return }
+                  !self.controller.state.isFloating(id),
+                  // No border in fullscreen — clicks emit stray drag ticks
+                  // that would flash it for a frame.
+                  self.controller.state.currentWorkspace.fullscreen != id else { return }
             self.borderOverlay.update(
                 around: frame,
                 appearance: BorderAppearance(general: self.controller.config.general))
