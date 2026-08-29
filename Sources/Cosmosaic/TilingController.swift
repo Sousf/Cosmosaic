@@ -128,6 +128,17 @@ final class TilingController {
             switchWorkspace(to: workspace)
         } else {
             if let workspace = state.workspace(of: id) {
+                // Fullscreen holds focus: raises alone lose to app
+                // activation (Raycast launches, new windows), so snap focus
+                // back — the re-activated app is what stays on top.
+                if workspace == state.current,
+                   let fullscreenID = state.currentWorkspace.fullscreen,
+                   fullscreenID != id,
+                   let fullscreen = windowManager.windows[fullscreenID] {
+                    AX.focus(fullscreen.element, pid: fullscreen.pid)
+                    onStateChanged?()
+                    return
+                }
                 state.setLastFocused(id, inWorkspace: workspace)
             }
             raiseFloatingWindows()
