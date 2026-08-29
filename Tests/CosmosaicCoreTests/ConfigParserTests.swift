@@ -197,6 +197,22 @@ final class ConfigParserTests: XCTestCase {
         XCTAssertThrowsError(try ConfigParser.parse("general {\n    float_below_size = big\n}"))
     }
 
+    func testParsesAnimationsBlock() throws {
+        let config = try ConfigParser.parse(
+            "animations {\n    enabled = 0\n    duration = 400\n}")
+        XCTAssertFalse(config.animations.enabled)
+        XCTAssertEqual(config.animations.durationMs, 400)
+
+        let defaults = try ConfigParser.parse("bind = ALT, Q, killactive")
+        XCTAssertTrue(defaults.animations.enabled)
+        XCTAssertEqual(defaults.animations.durationMs, 260)
+
+        XCTAssertThrowsError(try ConfigParser.parse(
+            "animations {\n    duration = -5\n}"))
+        XCTAssertThrowsError(try ConfigParser.parse(
+            "animations {\n    frobnicate = 1\n}"))
+    }
+
     func testParsesIslandBlock() throws {
         let off = try ConfigParser.parse("island {\n    enabled = 0\n}")
         XCTAssertFalse(off.island.enabled)

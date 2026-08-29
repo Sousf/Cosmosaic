@@ -34,6 +34,11 @@ final class ConfigManager {
         enabled = 1         # notch island: workspace + media controls
     }
 
+    animations {
+        enabled = 1         # smooth window swaps and fullscreen transitions
+        duration = 260      # milliseconds
+    }
+
     $mod = ALT
 
     # Launch things

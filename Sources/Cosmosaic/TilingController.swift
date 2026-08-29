@@ -9,6 +9,11 @@ final class TilingController {
 
     let windowManager: WindowManager
     let state = WorkspaceState()
+    let animator = WindowAnimator()
+
+    private var animationDuration: Int {
+        config.animations.enabled ? config.animations.durationMs : 0
+    }
     private(set) var config = Config()
     private(set) var paused = false
 
@@ -199,6 +204,8 @@ final class TilingController {
 
     func relayout() {
         guard !paused else { return }
+        // An instant relayout supersedes any in-flight animation.
+        animator.cancel()
 
         let workspace = state.currentWorkspace
         let frames = currentTiledFrames()
@@ -310,10 +317,9 @@ final class TilingController {
         case .fullscreen:
             guard let focused = focusedManaged(),
                   let workspace = state.workspace(of: focused.id) else { return }
-            let current = state.workspaces[workspace]?.fullscreen
-            state.setFullscreen(current == focused.id ? nil : focused.id,
-                                inWorkspace: workspace)
-            relayout()
+            let entering = state.workspaces[workspace]?.fullscreen != focused.id
+            state.setFullscreen(entering ? focused.id : nil, inWorkspace: workspace)
+            toggleFullscreenAnimated(focused, workspace: workspace, entering: entering)
 
         case .resizeactive(let dx, let dy):
             guard let focused = focusedManaged(),
@@ -325,6 +331,38 @@ final class TilingController {
 
         case .reload:
             onReloadRequested?()
+        }
+    }
+
+    /// Grow into (or shrink out of) fullscreen as one smooth motion; the
+    /// completing relayout trues everything up.
+    private func toggleFullscreenAnimated(_ managed: WindowManager.Managed,
+                                          workspace: Int, entering: Bool) {
+        guard animationDuration > 0, workspace == state.current,
+              !state.isFloating(managed.id),
+              let from = AX.frame(of: managed.element),
+              let screenKey = state.screenOf[managed.id],
+              let screen = Screens.screen(for: screenKey) else {
+            relayout()
+            return
+        }
+        let target: CGRect
+        if entering {
+            target = AX.tileableArea(of: screen)
+            AX.raise(managed.element)
+        } else {
+            guard let tile = currentTiledFrames()[managed.id] else {
+                relayout()
+                return
+            }
+            target = tile
+        }
+        onStateChanged?()  // border hides immediately when entering
+        animator.animate([WindowAnimator.Item(element: managed.element,
+                                              from: from, to: target,
+                                              isFocused: true)],
+                         durationMs: animationDuration) { [weak self] in
+            self?.relayout()
         }
     }
 
@@ -449,10 +487,29 @@ final class TilingController {
     private func moveWindow(_ direction: Direction) {
         guard let focusedID = windowManager.focusedID,
               !state.isFloating(focusedID) else { return }
-        let frames = currentTiledFrames()
+        let before = currentTiledFrames()
         guard let neighbor = LayoutGeometry.neighbor(of: focusedID, direction: direction,
-                                                     in: frames) else { return }
+                                                     in: before) else { return }
         state.swapInTree(focusedID, neighbor)
-        relayout()
+
+        // Float the two windows across each other; everything else is
+        // untouched by a sibling swap. The completing relayout trues up.
+        let after = currentTiledFrames()
+        guard animationDuration > 0,
+              let fromA = before[focusedID], let toA = after[focusedID],
+              let fromB = before[neighbor], let toB = after[neighbor],
+              let managedA = windowManager.windows[focusedID],
+              let managedB = windowManager.windows[neighbor] else {
+            relayout()
+            return
+        }
+        animator.animate([
+            WindowAnimator.Item(element: managedA.element, from: fromA, to: toA,
+                                isFocused: true),
+            WindowAnimator.Item(element: managedB.element, from: fromB, to: toB,
+                                isFocused: false),
+        ], durationMs: animationDuration) { [weak self] in
+            self?.relayout()
+        }
     }
 }

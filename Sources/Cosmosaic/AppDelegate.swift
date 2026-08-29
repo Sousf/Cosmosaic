@@ -42,6 +42,16 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             guard let self, id == self.windowManager.focusedID else { return }
             self.refreshBorder()
         }
+        // The border glides with the focused window during animations.
+        controller.animator.onFocusedFrame = { [weak self] frame in
+            guard let self, !self.controller.paused,
+                  let id = self.windowManager.focusedID,
+                  !self.controller.state.isFloating(id),
+                  self.controller.state.currentWorkspace.fullscreen != id else { return }
+            self.borderOverlay.update(
+                around: frame,
+                appearance: BorderAppearance(general: self.controller.config.general))
+        }
         // Drags and clicks reorder windows without any AX event; the mouse
         // tracker drives live border tracking and z-order re-assertion.
         mouseTracker.focusedElement = { [weak self] in

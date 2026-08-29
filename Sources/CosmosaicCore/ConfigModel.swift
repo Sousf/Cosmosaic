@@ -147,9 +147,18 @@ public struct IslandConfig: Sendable, Equatable {
     public init() {}
 }
 
+public struct AnimationsConfig: Sendable, Equatable {
+    /// Animate window swaps and fullscreen transitions.
+    public var enabled: Bool = true
+    public var durationMs: Int = 260
+
+    public init() {}
+}
+
 public struct Config: Sendable, Equatable {
     public var input = InputConfig()
     public var island = IslandConfig()
+    public var animations = AnimationsConfig()
     public var binds: [Keybind] = []
     /// Parallel to `binds`: source location of each bind.
     public var bindProvenance: [BindProvenance] = []
