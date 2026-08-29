@@ -60,11 +60,15 @@ final class ConfigManager {
     bind = $mod, UP, movefocus, u
     bind = $mod, DOWN, movefocus, d
 
-    # Swap windows
+    # Swap windows (vim keys and arrows)
     bind = $mod SHIFT, H, movewindow, l
     bind = $mod SHIFT, L, movewindow, r
     bind = $mod SHIFT, K, movewindow, u
     bind = $mod SHIFT, J, movewindow, d
+    bind = $mod SHIFT, LEFT, movewindow, l
+    bind = $mod SHIFT, RIGHT, movewindow, r
+    bind = $mod SHIFT, UP, movewindow, u
+    bind = $mod SHIFT, DOWN, movewindow, d
 
     # Resize the focused window
     bind = $mod CTRL, H, resizeactive, -40 0
