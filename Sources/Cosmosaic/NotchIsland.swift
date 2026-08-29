@@ -7,6 +7,9 @@ final class IslandModel: ObservableObject {
     @Published var workspace = 1
     @Published var nowPlaying: MediaController.NowPlaying?
     @Published var expanded = false
+    /// Width of the physical notch to leave hollow in the collapsed strip;
+    /// zero means no notch — render as a compact pill instead.
+    @Published var notchGap: CGFloat = 0
 
     var onHoverChanged: ((Bool) -> Void)?
     var onPlayPause: (() -> Void)?
@@ -28,17 +31,27 @@ final class NotchIsland {
         NSScreen.screens.first { $0.safeAreaInsets.top > 0 } ?? NSScreen.main
     }
 
-    private var notchWidth: CGFloat {
-        guard let screen,
+    /// Physical notch width, or nil on displays without one.
+    private var notchWidth: CGFloat? {
+        guard let screen, screen.safeAreaInsets.top > 0,
               let left = screen.auxiliaryTopLeftArea,
-              let right = screen.auxiliaryTopRightArea else { return 180 }
+              let right = screen.auxiliaryTopRightArea else { return nil }
         return right.minX - left.maxX
     }
 
     private var collapsedFrame: NSRect {
         guard let screen else { return .zero }
-        let height = max(screen.safeAreaInsets.top, 30)
-        let width = notchWidth + 128
+        let height: CGFloat
+        let width: CGFloat
+        if let notchWidth {
+            // Slim wings hugging the housing, exactly notch-height tall.
+            height = screen.safeAreaInsets.top
+            width = notchWidth + 88
+        } else {
+            // No notch: a compact pill overlapping the menu bar's center.
+            height = 24
+            width = 96
+        }
         return NSRect(x: screen.frame.midX - width / 2,
                       y: screen.frame.maxY - height,
                       width: width, height: height)
@@ -73,6 +86,7 @@ final class NotchIsland {
         model.onHoverChanged = { [weak self] hovering in
             self?.hoverChanged(hovering)
         }
+        model.notchGap = notchWidth ?? 0
         panel?.setFrame(collapsedFrame, display: true)
         panel?.orderFrontRegardless()
     }
@@ -133,17 +147,20 @@ private struct IslandView: View {
     }
 
     private var collapsed: some View {
-        HStack {
+        HStack(spacing: 0) {
             Text("\(model.workspace)")
                 .font(.system(size: 13, weight: .bold, design: .rounded))
                 .monospacedDigit()
                 .foregroundStyle(.white)
-                .padding(.leading, 22)
-            Spacer()
+                .frame(maxWidth: .infinity)
+            if model.notchGap > 0 {
+                // Hollow center: the physical notch lives here.
+                Spacer().frame(width: model.notchGap)
+            }
             Image(systemName: glyph)
                 .font(.system(size: 11, weight: .semibold))
                 .foregroundStyle(model.nowPlaying?.isPlaying == true ? .green : .gray)
-                .padding(.trailing, 22)
+                .frame(maxWidth: .infinity)
         }
     }
 
