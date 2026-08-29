@@ -111,6 +111,12 @@ final class StatusMenu: NSObject, NSMenuDelegate {
         island.state = configManager.config.island.enabled ? .on : .off
         menu.addItem(island)
 
+        let login = NSMenuItem(title: "Launch at Login",
+                               action: #selector(toggleLaunchAtLogin), keyEquivalent: "")
+        login.target = self
+        login.state = LoginItem.isEnabled ? .on : .off
+        menu.addItem(login)
+
         let reload = NSMenuItem(title: "Reload Config", action: #selector(reloadConfig),
                                 keyEquivalent: "")
         reload.target = self
@@ -147,6 +153,10 @@ final class StatusMenu: NSObject, NSMenuDelegate {
 
     @objc private func toggleIsland() {
         configManager.setIslandEnabled(!configManager.config.island.enabled)
+    }
+
+    @objc private func toggleLaunchAtLogin() {
+        LoginItem.setEnabled(!LoginItem.isEnabled)
     }
 
     @objc private func reloadConfig() {

@@ -18,6 +18,8 @@ final class KeybindingsModel: ObservableObject {
     @Published private(set) var axTrusted = false
     /// Mirrors the tiling controller's pause state (session-only).
     @Published private(set) var tilingPaused = false
+    /// System login-item state (persisted by macOS, not the config file).
+    @Published private(set) var launchAtLogin = false
 
     private let configManager: ConfigManager
     var onRecordingStarted: (() -> Void)?
@@ -113,9 +115,15 @@ final class KeybindingsModel: ObservableObject {
     func refresh() {
         config = configManager.config
         axTrusted = AX.isTrusted
+        launchAtLogin = LoginItem.isEnabled
         pendingBorderSize = nil
         loadInstalledApps()
         refreshToken = UUID()
+    }
+
+    func setLaunchAtLogin(_ enabled: Bool) {
+        LoginItem.setEnabled(enabled)
+        launchAtLogin = LoginItem.isEnabled
     }
 
     struct InstalledApp: Identifiable, Hashable {
@@ -474,6 +482,15 @@ struct KeybindingsView: View {
                 Toggle("", isOn: Binding(
                     get: { model.followMouse },
                     set: { model.setFollowMouse($0) }))
+                    .toggleStyle(.switch).labelsHidden()
+            }
+            Divider().padding(.leading, 56)
+            settingRow(symbol: "power", tint: .indigo,
+                       title: "Launch at login",
+                       subtitle: "Start Cosmosaic automatically — managed in System Settings › Login Items") {
+                Toggle("", isOn: Binding(
+                    get: { model.launchAtLogin },
+                    set: { model.setLaunchAtLogin($0) }))
                     .toggleStyle(.switch).labelsHidden()
             }
             Divider().padding(.leading, 56)
