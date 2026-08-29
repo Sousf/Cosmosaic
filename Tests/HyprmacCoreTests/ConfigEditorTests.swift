@@ -139,7 +139,8 @@ final class ConfigEditorTests: XCTestCase {
                                           block: "general",
                                           key: "col.active_border",
                                           value: color.rgbaText)
-        XCTAssertEqual(try ConfigParser.parse(text).general.activeBorderColor, color)
+        XCTAssertEqual(try ConfigParser.parse(text).general.activeBorder,
+                       BorderFill(colors: [color]))
     }
 
     func testSerializeAllDispatcherShapes() {

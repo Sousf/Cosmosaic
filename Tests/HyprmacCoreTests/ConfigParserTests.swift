@@ -101,10 +101,63 @@ final class ConfigParserTests: XCTestCase {
         XCTAssertEqual(config.general.gapsIn, 4)
         XCTAssertEqual(config.general.gapsOut, 12)
         XCTAssertEqual(config.general.borderSize, 2)
-        XCTAssertEqual(config.general.activeBorderColor,
-                       ConfigColor(r: 0x33, g: 0xcc, b: 0xff, a: 0xee))
+        XCTAssertEqual(config.general.activeBorder,
+                       BorderFill(colors: [ConfigColor(r: 0x33, g: 0xcc, b: 0xff, a: 0xee)],
+                                  angleDegrees: 0))
         XCTAssertEqual(config.general.inactiveBorderColor,
                        ConfigColor(r: 0x59, g: 0x59, b: 0x59, a: 0xff))
+    }
+
+    func testParsesGradientBorderWithAngle() throws {
+        let config = try ConfigParser.parse(
+            "general {\n    col.active_border = rgba(33ccffee) rgba(8839efee) 45deg\n}")
+
+        XCTAssertEqual(config.general.activeBorder, BorderFill(
+            colors: [ConfigColor(r: 0x33, g: 0xcc, b: 0xff, a: 0xee),
+                     ConfigColor(r: 0x88, g: 0x39, b: 0xef, a: 0xee)],
+            angleDegrees: 45))
+    }
+
+    func testGradientWithoutAngleDefaultsToZero() throws {
+        let config = try ConfigParser.parse(
+            "general {\n    col.active_border = rgb(ff0000) rgb(0000ff)\n}")
+
+        XCTAssertEqual(config.general.activeBorder.colors.count, 2)
+        XCTAssertEqual(config.general.activeBorder.angleDegrees, 0)
+    }
+
+    func testInvalidGradientStopThrows() {
+        XCTAssertThrowsError(try ConfigParser.parse(
+            "general {\n    col.active_border = rgb(ff0000) banana\n}"))
+    }
+
+    func testParsesBorderAnimation() throws {
+        let rainbow = try ConfigParser.parse("general {\n    border_animation = rainbow\n}")
+        XCTAssertEqual(rainbow.general.borderAnimation, .rainbow)
+
+        let none = try ConfigParser.parse("bind = ALT, Q, killactive")
+        XCTAssertEqual(none.general.borderAnimation, BorderAnimation.none)
+
+        XCTAssertThrowsError(try ConfigParser.parse(
+            "general {\n    border_animation = disco\n}"))
+    }
+
+    func testParsesBorderAnimationSpeed() throws {
+        let config = try ConfigParser.parse("general {\n    border_animation_speed = 2.5\n}")
+        XCTAssertEqual(config.general.borderAnimationSpeed, 2.5)
+
+        XCTAssertThrowsError(try ConfigParser.parse(
+            "general {\n    border_animation_speed = -1\n}"))
+    }
+
+    func testBorderFillSerializesToConfigText() {
+        XCTAssertEqual(BorderFill(colors: [ConfigColor(r: 0x33, g: 0xcc, b: 0xff, a: 0xee)],
+                                  angleDegrees: 0).configText,
+                       "rgba(33ccffee)")
+        XCTAssertEqual(BorderFill(colors: [ConfigColor(r: 0xff, g: 0, b: 0, a: 0xff),
+                                           ConfigColor(r: 0, g: 0, b: 0xff, a: 0xff)],
+                                  angleDegrees: 45).configText,
+                       "rgba(ff0000ff) rgba(0000ffff) 45deg")
     }
 
     func testGeneralDefaultsWhenAbsent() throws {

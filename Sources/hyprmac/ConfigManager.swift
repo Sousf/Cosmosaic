@@ -17,6 +17,10 @@ final class ConfigManager {
         gaps_out = 12
         border_size = 2
         col.active_border = rgba(33ccffee)
+        # Gradient: col.active_border = rgba(33ccffee) rgba(8839efee) 45deg
+        # Moving rainbow: border_animation = rainbow (speed via
+        # border_animation_speed = 1.0)
+        border_animation = none
         col.inactive_border = rgba(59595900)
         float_below_size = 350 250    # windows smaller than this in BOTH
                                       # dimensions float; 0 0 disables
@@ -152,12 +156,19 @@ final class ConfigManager {
                                            value: enabled ? "1" : "0"))
     }
 
-    /// Persist the focus-border color (surgical edit + immediate reload).
+    /// Apply several block-option edits as one write (one reload).
+    func applyGeneralEdits(_ edits: [(key: String, value: String)]) {
+        guard var text = fileText() else { return }
+        for edit in edits {
+            text = ConfigEditor.setOption(in: text, block: "general",
+                                          key: edit.key, value: edit.value)
+        }
+        write(text: text)
+    }
+
+    /// Persist the focus-border color (replaces any gradient with a solid).
     func setActiveBorderColor(_ color: ConfigColor) {
-        guard let text = fileText() else { return }
-        write(text: ConfigEditor.setOption(in: text, block: "general",
-                                           key: "col.active_border",
-                                           value: color.rgbaText))
+        applyGeneralEdits([(key: "col.active_border", value: color.rgbaText)])
     }
 
     /// Persist the focus-border thickness (0 hides the border).

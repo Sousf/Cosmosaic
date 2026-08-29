@@ -40,7 +40,42 @@ final class KeybindingsModel: ObservableObject {
         configManager.setFollowMouse(enabled)
     }
 
-    var activeBorderColor: ConfigColor { config.general.activeBorderColor }
+    enum BorderStyleChoice: String, CaseIterable, Identifiable {
+        case solid = "Solid"
+        case gradient = "Gradient"
+        case rainbow = "Rainbow"
+        var id: String { rawValue }
+    }
+
+    var activeBorderColor: ConfigColor {
+        config.general.activeBorder.colors.first
+            ?? ConfigColor(r: 0x33, g: 0xcc, b: 0xff, a: 0xee)
+    }
+
+    var borderStyle: BorderStyleChoice {
+        if config.general.borderAnimation == .rainbow { return .rainbow }
+        return config.general.activeBorder.colors.count > 1 ? .gradient : .solid
+    }
+
+    func setBorderStyle(_ style: BorderStyleChoice) {
+        let first = activeBorderColor
+        switch style {
+        case .solid:
+            configManager.applyGeneralEdits([
+                (key: "col.active_border", value: BorderFill(colors: [first]).configText),
+                (key: "border_animation", value: "none"),
+            ])
+        case .gradient:
+            let second = ConfigColor(r: 0x88, g: 0x39, b: 0xef, a: first.a)
+            configManager.applyGeneralEdits([
+                (key: "col.active_border",
+                 value: BorderFill(colors: [first, second], angleDegrees: 45).configText),
+                (key: "border_animation", value: "none"),
+            ])
+        case .rainbow:
+            configManager.applyGeneralEdits([(key: "border_animation", value: "rainbow")])
+        }
+    }
     /// Pending value shown while a debounced write is in flight, so rapid
     /// stepper clicks accumulate instead of re-reading the stale config.
     @Published private var pendingBorderSize: Int?
@@ -410,13 +445,24 @@ struct KeybindingsView: View {
             Divider().padding(.leading, 56)
             settingRow(symbol: "paintbrush.fill", tint: .pink,
                        title: "Focus border",
-                       subtitle: "Color and thickness (0 px hides it) — saved to hyprmac.conf") {
+                       subtitle: "Style, color, and thickness (0 px hides it) — saved to hyprmac.conf") {
                 HStack(spacing: 12) {
+                    Picker("", selection: Binding(
+                        get: { model.borderStyle },
+                        set: { model.setBorderStyle($0) })) {
+                        ForEach(KeybindingsModel.BorderStyleChoice.allCases) { style in
+                            Text(style.rawValue).tag(style)
+                        }
+                    }
+                    .labelsHidden()
+                    .frame(width: 100)
                     ColorPicker("", selection: Binding(
                         get: { Color(configColor: model.activeBorderColor) },
                         set: { model.setActiveBorderColor(ConfigColor(color: $0)) }),
                         supportsOpacity: true)
                         .labelsHidden()
+                        .disabled(model.borderStyle == .rainbow)
+                        .opacity(model.borderStyle == .rainbow ? 0.4 : 1)
                     Stepper(value: Binding(
                         get: { model.borderSize },
                         set: { model.setBorderSize($0) }), in: 0...12) {

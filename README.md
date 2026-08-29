@@ -58,7 +58,10 @@ general {
     gaps_in = 6                          # gap between windows
     gaps_out = 12                        # gap at screen edges
     border_size = 2                      # focused-window border (0 = off)
-    col.active_border = rgba(33ccffee)
+    col.active_border = rgba(33ccffee)   # or a gradient:
+                                         #   rgba(..) rgba(..) 45deg
+    border_animation = none              # rainbow = moving rainbow border
+    border_animation_speed = 1.0
 }
 
 input {

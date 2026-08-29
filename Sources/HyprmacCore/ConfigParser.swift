@@ -180,8 +180,21 @@ extension ConfigParser {
         case "gaps_in": general.gapsIn = try integer()
         case "gaps_out": general.gapsOut = try integer()
         case "border_size": general.borderSize = try integer()
-        case "col.active_border": general.activeBorderColor = try parseColor(value, line: line)
+        case "col.active_border":
+            general.activeBorder = try parseBorderFill(value, line: line)
         case "col.inactive_border": general.inactiveBorderColor = try parseColor(value, line: line)
+        case "border_animation":
+            guard let animation = BorderAnimation(rawValue: value.lowercased()) else {
+                throw ConfigError(line: line,
+                                  message: "border_animation expects none/rainbow, got '\(value)'")
+            }
+            general.borderAnimation = animation
+        case "border_animation_speed":
+            guard let speed = Double(value), speed > 0 else {
+                throw ConfigError(line: line,
+                                  message: "border_animation_speed expects a positive number, got '\(value)'")
+            }
+            general.borderAnimationSpeed = speed
         case "float_below_size":
             let parts = value.split(separator: " ").compactMap { Int($0) }
             guard parts.count == 2, parts[0] >= 0, parts[1] >= 0 else {
@@ -207,6 +220,26 @@ extension ConfigParser {
         default:
             throw ConfigError(line: line, message: "unknown input option '\(key)'")
         }
+    }
+
+    /// `rgba(..) [rgba(..)...] [45deg]` — one or more stops, optional angle.
+    static func parseBorderFill(_ text: String, line: Int) throws -> BorderFill {
+        var colors: [ConfigColor] = []
+        var angle = 0
+        for token in text.split(separator: " ") {
+            if token.hasSuffix("deg") {
+                guard let degrees = Int(token.dropLast(3)) else {
+                    throw ConfigError(line: line, message: "invalid angle '\(token)'")
+                }
+                angle = degrees
+            } else {
+                colors.append(try parseColor(String(token), line: line))
+            }
+        }
+        guard !colors.isEmpty else {
+            throw ConfigError(line: line, message: "col.active_border needs at least one color")
+        }
+        return BorderFill(colors: colors, angleDegrees: angle)
     }
 
     static func parseColor(_ text: String, line: Int) throws -> ConfigColor {

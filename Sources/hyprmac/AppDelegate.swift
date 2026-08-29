@@ -48,9 +48,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         }
         mouseTracker.onDragTick = { [weak self] frame in
             guard let self, !self.controller.paused else { return }
-            self.borderOverlay.update(around: frame,
-                                      color: self.controller.config.general.activeBorderColor,
-                                      width: self.controller.config.general.borderSize)
+            self.borderOverlay.update(
+                around: frame,
+                appearance: BorderAppearance(general: self.controller.config.general))
         }
         mouseTracker.onSettled = { [weak self] in
             guard let self else { return }
@@ -123,8 +123,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             return
         }
         borderOverlay.update(around: frame,
-                             color: controller.config.general.activeBorderColor,
-                             width: controller.config.general.borderSize)
+                             appearance: BorderAppearance(general: controller.config.general))
     }
 
     func applicationWillTerminate(_ notification: Notification) {
