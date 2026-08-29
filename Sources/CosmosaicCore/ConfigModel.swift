@@ -140,8 +140,16 @@ public struct InputConfig: Sendable, Equatable {
     public init() {}
 }
 
+public struct IslandConfig: Sendable, Equatable {
+    /// The notch island: workspace indicator + media controls.
+    public var enabled: Bool = true
+
+    public init() {}
+}
+
 public struct Config: Sendable, Equatable {
     public var input = InputConfig()
+    public var island = IslandConfig()
     public var binds: [Keybind] = []
     /// Parallel to `binds`: source location of each bind.
     public var bindProvenance: [BindProvenance] = []

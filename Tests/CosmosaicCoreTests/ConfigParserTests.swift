@@ -197,6 +197,16 @@ final class ConfigParserTests: XCTestCase {
         XCTAssertThrowsError(try ConfigParser.parse("general {\n    float_below_size = big\n}"))
     }
 
+    func testParsesIslandBlock() throws {
+        let off = try ConfigParser.parse("island {\n    enabled = 0\n}")
+        XCTAssertFalse(off.island.enabled)
+
+        let defaults = try ConfigParser.parse("bind = ALT, Q, killactive")
+        XCTAssertTrue(defaults.island.enabled)
+
+        XCTAssertThrowsError(try ConfigParser.parse("island {\n    frobnicate = 1\n}"))
+    }
+
     func testParsesInputBlockFollowMouse() throws {
         let off = try ConfigParser.parse("input {\n    follow_mouse = 0\n}")
         XCTAssertFalse(off.input.followMouse)

@@ -105,6 +105,12 @@ final class StatusMenu: NSObject, NSMenuDelegate {
         followMouse.state = configManager.config.input.followMouse ? .on : .off
         menu.addItem(followMouse)
 
+        let island = NSMenuItem(title: "Notch Island",
+                                action: #selector(toggleIsland), keyEquivalent: "")
+        island.target = self
+        island.state = configManager.config.island.enabled ? .on : .off
+        menu.addItem(island)
+
         let reload = NSMenuItem(title: "Reload Config", action: #selector(reloadConfig),
                                 keyEquivalent: "")
         reload.target = self
@@ -137,6 +143,10 @@ final class StatusMenu: NSObject, NSMenuDelegate {
 
     @objc private func toggleFollowMouse() {
         configManager.setFollowMouse(!configManager.config.input.followMouse)
+    }
+
+    @objc private func toggleIsland() {
+        configManager.setIslandEnabled(!configManager.config.island.enabled)
     }
 
     @objc private func reloadConfig() {

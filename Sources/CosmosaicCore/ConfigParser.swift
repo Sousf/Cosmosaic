@@ -115,7 +115,7 @@ extension ConfigParser {
                     throw ConfigError(line: lineNumber, message: "nested blocks are not supported")
                 }
                 let name = line.dropLast().trimmingCharacters(in: .whitespaces)
-                guard name == "general" || name == "input" else {
+                guard name == "general" || name == "input" || name == "island" else {
                     throw ConfigError(line: lineNumber, message: "unknown block '\(name)'")
                 }
                 openBlock = (name, lineNumber)
@@ -134,6 +134,13 @@ extension ConfigParser {
             }
             if openBlock?.name == "input" {
                 try setInputOption(&config.input, key: key, value: value, line: lineNumber)
+                continue
+            }
+            if openBlock?.name == "island" {
+                guard key == "enabled" else {
+                    throw ConfigError(line: lineNumber, message: "unknown island option '\(key)'")
+                }
+                config.island.enabled = try parseBool(value, key: key, line: lineNumber)
                 continue
             }
 
@@ -207,16 +214,20 @@ extension ConfigParser {
         }
     }
 
+    static func parseBool(_ value: String, key: String, line: Int) throws -> Bool {
+        switch value.lowercased() {
+        case "1", "true", "yes", "on": return true
+        case "0", "false", "no", "off": return false
+        default:
+            throw ConfigError(line: line, message: "\(key) expects 0/1, got '\(value)'")
+        }
+    }
+
     static func setInputOption(_ input: inout InputConfig,
                                key: String, value: String, line: Int) throws {
         switch key {
         case "follow_mouse":
-            switch value.lowercased() {
-            case "1", "true", "yes", "on": input.followMouse = true
-            case "0", "false", "no", "off": input.followMouse = false
-            default:
-                throw ConfigError(line: line, message: "follow_mouse expects 0/1, got '\(value)'")
-            }
+            input.followMouse = try parseBool(value, key: key, line: line)
         default:
             throw ConfigError(line: line, message: "unknown input option '\(key)'")
         }
