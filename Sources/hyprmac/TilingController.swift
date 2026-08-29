@@ -58,7 +58,10 @@ final class TilingController {
     }
 
     private func track(_ managed: WindowManager.Managed) {
+        // Only windows that can actually be resized are tiled; fixed-size
+        // windows (settings panels, about boxes) float at their natural size.
         let floating = shouldFloat(appName: managed.appName)
+            || !AX.isResizable(managed.element)
         let frame = AX.frame(of: managed.element) ?? .zero
         let screen = Screens.screenContaining(axPoint: CGPoint(x: frame.midX, y: frame.midY))
             ?? NSScreen.main

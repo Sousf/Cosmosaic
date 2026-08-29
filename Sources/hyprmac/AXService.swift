@@ -78,6 +78,16 @@ enum AX {
             && !isMinimized(element)
     }
 
+    /// Whether the app lets this window be resized. Fixed-size windows
+    /// (settings panels, about boxes) must float — tiling one stretches the
+    /// tile but not the window, leaving it hovering over the layout.
+    static func isResizable(_ element: AXUIElement) -> Bool {
+        var settable = DarwinBoolean(false)
+        let result = AXUIElementIsAttributeSettable(element, kAXSizeAttribute as CFString,
+                                                    &settable)
+        return result == .success && settable.boolValue
+    }
+
     /// A popup the app owns (save prompt, alert, floating panel): never tiled,
     /// but kept above the tiled layer. Sheets are excluded — macOS attaches
     /// them to their parent window itself.
