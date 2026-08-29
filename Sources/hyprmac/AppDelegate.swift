@@ -35,6 +35,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         keybindingsModel.onSetTilingEnabled = { [weak self] enabled in
             self?.controller.setPaused(!enabled)
         }
+        windowManager.onWindowMoved = { [weak self] id in
+            guard let self, id == self.windowManager.focusedID else { return }
+            self.refreshBorder()
+        }
 
         focusFollowsMouse = FocusFollowsMouse(controller: controller)
 

@@ -22,6 +22,8 @@ final class WindowManager {
     var onWindowAdded: ((Managed) -> Void)?
     var onWindowRemoved: ((WindowID) -> Void)?
     var onFocusChanged: ((WindowID?) -> Void)?
+    /// The window moved or resized outside hyprmac's control (user drag).
+    var onWindowMoved: ((WindowID) -> Void)?
 
     func start() {
         let center = NSWorkspace.shared.notificationCenter
@@ -170,7 +172,9 @@ final class WindowManager {
         let refcon = Unmanaged.passUnretained(self).toOpaque()
         for notification in [kAXUIElementDestroyedNotification,
                              kAXWindowMiniaturizedNotification,
-                             kAXWindowDeminiaturizedNotification] {
+                             kAXWindowDeminiaturizedNotification,
+                             kAXMovedNotification,
+                             kAXResizedNotification] {
             AXObserverAddNotification(observer, element, notification as CFString, refcon)
         }
     }
@@ -188,6 +192,9 @@ final class WindowManager {
 
         case kAXUIElementDestroyedNotification, kAXWindowMiniaturizedNotification:
             if let id = findID(of: element) { unregister(id) }
+
+        case kAXMovedNotification, kAXResizedNotification:
+            if let id = findID(of: element) { onWindowMoved?(id) }
 
         case kAXFocusedWindowChangedNotification:
             if let id = findID(of: element) {
