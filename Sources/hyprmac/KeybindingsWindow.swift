@@ -40,6 +40,20 @@ final class KeybindingsModel: ObservableObject {
         configManager.setFollowMouse(enabled)
     }
 
+    var activeBorderColor: ConfigColor { config.general.activeBorderColor }
+
+    private var colorDebounce: DispatchWorkItem?
+
+    /// Color pickers fire continuously while dragging; debounce the file write.
+    func setActiveBorderColor(_ color: ConfigColor) {
+        colorDebounce?.cancel()
+        let work = DispatchWorkItem { [weak self] in
+            self?.configManager.setActiveBorderColor(color)
+        }
+        colorDebounce = work
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.3, execute: work)
+    }
+
     init(configManager: ConfigManager) {
         self.configManager = configManager
         refresh()
@@ -376,6 +390,16 @@ struct KeybindingsView: View {
                     set: { model.setFollowMouse($0) }))
                     .toggleStyle(.switch).labelsHidden()
             }
+            Divider().padding(.leading, 56)
+            settingRow(symbol: "paintbrush.fill", tint: .pink,
+                       title: "Focus border color",
+                       subtitle: "Drawn around the focused window — saved to hyprmac.conf") {
+                ColorPicker("", selection: Binding(
+                    get: { Color(configColor: model.activeBorderColor) },
+                    set: { model.setActiveBorderColor(ConfigColor(color: $0)) }),
+                    supportsOpacity: true)
+                    .labelsHidden()
+            }
         }
     }
 
@@ -448,6 +472,26 @@ struct KeybindingsView: View {
         .padding(.horizontal, 20)
         .padding(.vertical, 12)
         .background(.bar)
+    }
+}
+
+extension Color {
+    init(configColor: ConfigColor) {
+        self.init(.sRGB,
+                  red: Double(configColor.r) / 255,
+                  green: Double(configColor.g) / 255,
+                  blue: Double(configColor.b) / 255,
+                  opacity: Double(configColor.a) / 255)
+    }
+}
+
+extension ConfigColor {
+    init(color: Color) {
+        let ns = NSColor(color).usingColorSpace(.sRGB) ?? .cyan
+        self.init(r: UInt8((ns.redComponent * 255).rounded()),
+                  g: UInt8((ns.greenComponent * 255).rounded()),
+                  b: UInt8((ns.blueComponent * 255).rounded()),
+                  a: UInt8((ns.alphaComponent * 255).rounded()))
     }
 }
 

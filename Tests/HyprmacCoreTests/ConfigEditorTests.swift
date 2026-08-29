@@ -126,6 +126,22 @@ final class ConfigEditorTests: XCTestCase {
         XCTAssertEqual(try ConfigParser.parse(result).binds.count, 1)
     }
 
+    func testColorSerializesToRgbaText() {
+        XCTAssertEqual(ConfigColor(r: 0x33, g: 0xcc, b: 0xff, a: 0xee).rgbaText,
+                       "rgba(33ccffee)")
+        XCTAssertEqual(ConfigColor(r: 0, g: 0x0a, b: 0xff, a: 0xff).rgbaText,
+                       "rgba(000affff)")
+    }
+
+    func testColorRoundTripsThroughParser() throws {
+        let color = ConfigColor(r: 0x88, g: 0x39, b: 0xef, a: 0xee)
+        let text = ConfigEditor.setOption(in: "general {\n    gaps_in = 6\n}",
+                                          block: "general",
+                                          key: "col.active_border",
+                                          value: color.rgbaText)
+        XCTAssertEqual(try ConfigParser.parse(text).general.activeBorderColor, color)
+    }
+
     func testSerializeAllDispatcherShapes() {
         XCTAssertEqual(ConfigEditor.serialize(
             Keybind(mods: [.alt], key: "Q", dispatcher: .killactive)),

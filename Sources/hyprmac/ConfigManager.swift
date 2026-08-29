@@ -152,6 +152,14 @@ final class ConfigManager {
                                            value: enabled ? "1" : "0"))
     }
 
+    /// Persist the focus-border color (surgical edit + immediate reload).
+    func setActiveBorderColor(_ color: ConfigColor) {
+        guard let text = fileText() else { return }
+        write(text: ConfigEditor.setOption(in: text, block: "general",
+                                           key: "col.active_border",
+                                           value: color.rgbaText))
+    }
+
     /// Current raw file text, for UI-driven surgical edits.
     func fileText() -> String? {
         try? String(contentsOf: configURL, encoding: .utf8)

@@ -54,6 +54,11 @@ public struct ConfigColor: Sendable, Equatable {
         self.b = b
         self.a = a
     }
+
+    /// Config-file spelling of this color.
+    public var rgbaText: String {
+        String(format: "rgba(%02x%02x%02x%02x)", r, g, b, a)
+    }
 }
 
 public struct GeneralConfig: Sendable, Equatable {
