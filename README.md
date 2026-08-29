@@ -10,7 +10,9 @@ direct download.
 hyprmac is a menu-bar agent. It watches every normal window through the
 Accessibility API and tiles them into a dwindle BSP layout — each new window
 splits the focused one, alternating orientation by region aspect, exactly like
-Hyprland's default layout. Global hotkeys are registered through Carbon
+Hyprland's default layout. Only resizable windows tile: fixed-size windows
+(settings panels, about boxes) and dialog popups automatically float above
+the tiled layer. Global hotkeys are registered through Carbon
 `RegisterEventHotKey`, so bound keys are consumed before apps see them and no
 Input Monitoring permission is needed.
 
